@@ -1,91 +1,69 @@
-// swift-tools-version:6.2
+// swift-tools-version:7.0
 import PackageDescription
 
 let package = Package(
-    name: "ToolMiniUltra",
-    defaultLocalization: "en",
+    name: "ToolExp",
     platforms: [
-        .iOS(.v26),      // iPadOS 26 ≈ iOS 17
-        .macOS(.v15),    // macOS 15
-        .visionOS(.v26)   // visionOS 26 ≈ v1
+        .iOS(.v26),    // iPadOS 26
+        .macOS(.v15)
     ],
     products: [
-        // Core libraries
-        .library(name: "AIKit",           targets: ["AIKit"]),
-        .library(name: "BridgeKit",       targets: ["BridgeKit"]),
-        .library(name: "BuildKit",        targets: ["BuildKit"]),
-        .library(name: "DataServ",        targets: ["DataServ"]),
-        .library(name: "EngineKit",       targets: ["EngineKit"]),
-        .library(name: "InvestigateKit",  targets: ["InvestigateKit"]),
-        .library(name: "IntegrationKit",  targets: ["IntegrationKit"]),
-        .library(name: "MacroKit",        targets: ["MacroKit"]),
-        .library(name: "MLXIntegration",  targets: ["MLXIntegration"]),
-        .library(name: "ProjectKit",      targets: ["ProjectKit"]),
-        .library(name: "RenderKit",       targets: ["RenderKit"]),
-        .library(name: "RepKit",          targets: ["RepKit"]),
-        .library(name: "ServiceKit",      targets: ["ServiceKit"]),
-        .library(name: "StageKit",        targets: ["StageKit"]),
-        .executable(name: "ToolApp",      targets: ["ToolApp"]), // SwiftUI App
-        .library(name: "ToolMath",        targets: ["ToolMath"]),
-        .library(name: "UXKit",           targets: ["UXKit"]),
+        .library(   name: "RepKit",    targets: ["RepKit"]),
+        .library(   name: "DataServ",  targets: ["DataServ"]),
+        .library(   name: "StageKit",  targets: ["StageKit"]),
+        .library(   name: "RenderKit", targets: ["RenderKit"]),
+        .library(   name: "UXKit",     targets: ["UXKit"]),
+        .executable(name: "ToolApp",   targets: ["ToolApp"])
     ],
     dependencies: [
-        // No external dependencies for Tool-exp
+        // Local MLX.swift package for Metal-4 ML integration
+        .package(path: "MLX.swift"),
+        // Apple-provided utility packages
+        .package(url: "https://github.com/apple/swift-algorithms.git",   from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-collections.git",  from: "1.0.0")
     ],
     targets: [
-        // AIKit
-        .target(name: "AIKit", path: "Sources/AIKit"),
-
-        // BridgeKit
-        .target(name: "BridgeKit", path: "Sources/BridgeKit"),
-
-        // BuildKit
-        .target(name: "BuildKit", path: "Sources/BuildKit"),
-
-        // DataServ
-        .target(name: "DataServ", path: "Sources/DataServ"),
-
-        // EngineKit
-        .target(name: "EngineKit", path: "Sources/EngineKit"),
-
-        // InvestigateKit
-        .target(name: "InvestigateKit", path: "Sources/InvestigateKit"),
-
-        // IntegrationKit
-        .target(name: "IntegrationKit", path: "Sources/IntegrationKit"),
-
-        // MacroKit
-        .target(name: "MacroKit", path: "Sources/MacroKit"),
-
-        // MLXIntegration
-        .target(name: "MLXIntegration", path: "Sources/MLXIntegration"),
-
-        // ProjectKit
-        .target(name: "ProjectKit", path: "Sources/ProjectKit"),
-
-        // RenderKit + shaders
+        .target(
+            name: "RepKit",
+            dependencies: [
+                .product(name: "Algorithms",  package: "swift-algorithms"),
+                .product(name: "Collections", package: "swift-collections")
+            ]
+        ),
+        .target(
+            name: "DataServ",
+            dependencies: ["RepKit"],
+            swiftSettings: [
+                .unsafeFlags(["-enable-experimental-feature", "Macros"])
+            ]
+        ),
+        .target(
+            name: "StageKit",
+            dependencies: ["RepKit", "DataServ"]
+        ),
         .target(
             name: "RenderKit",
-            path: "Sources/RenderKit",
-            resources: [.process("Shaders")]
+            dependencies: [
+                "RepKit",
+                .product(name: "MLXIntegration", package: "MLX.swift")
+            ],
+            linkerSettings: [
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+                .linkedFramework("MetalPerformanceShaders"),
+                .linkedFramework("MetalFX")
+            ]
         ),
-
-        // RepKit
-        .target(name: "RepKit", path: "Sources/RepKit"),
-
-        // ServiceKit
-        .target(name: "ServiceKit", path: "Sources/ServiceKit"),
-
-        // StageKit
-        .target(name: "StageKit", path: "Sources/StageKit"),
-
-        // ToolApp
-        .executableTarget(name: "ToolApp", path: "Sources/ToolApp"),
-
-        // ToolMath
-        .target(name: "ToolMath", path: "Sources/ToolMath"),
-
-        // UXKit
-        .target(name: "UXKit", path: "Sources/UXKit"),
+        .target(
+            name: "UXKit",
+            dependencies: ["RepKit", "DataServ", "StageKit"]
+        ),
+        .executableTarget(
+            name: "ToolApp",
+            dependencies: ["StageKit", "RenderKit", "UXKit"]
+        )
+        // Uncomment and add proper Test folders when ready:
+        // .testTarget(name: "RepKitTests",   dependencies: ["RepKit"]),
+        // .testTarget(name: "DataServTests", dependencies: ["DataServ"])
     ]
 )

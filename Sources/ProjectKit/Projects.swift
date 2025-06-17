@@ -1,70 +1,50 @@
-//
-//  Projects.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/16/25.
-//
-
-//
 // Projects.swift
-// ProjectKit — Manages multiple project workspaces and their metadata.
-//
-// Responsibilities:
-//  • Track open projects, each with its own folder, settings, and Rep collection.
-//  • Create, rename, delete, and switch projects.
-//  • Persist project list via SwiftData or AppSettings.
-//
+// CRUD for ProjectEntity using SwiftData (iOS/macOS 26+)
 
 import Foundation
 import SwiftData
 
-/// A single project workspace.
 @Model
-public class ProjectEntity {
+public class ProjectEntity: Observable {
     @Attribute(.unique) public var id: UUID
     public var name: String
-    public var folderURL: URL
+    public var lastModified: Date
 
-    public init(id: UUID = .init(), name: String, folderURL: URL) {
+    public init(
+        id: UUID = .init(),
+        name: String,
+        lastModified: Date = .init()
+    ) {
         self.id = id
         self.name = name
-        self.folderURL = folderURL
+        self.lastModified = lastModified
     }
 }
 
-/// High-level API for managing multiple projects.
+/// Manages your Projects database.
 public actor Projects {
-    private let context: ModelContext
+    public let context: ModelContext
 
-    /// Inject a ModelContext configured with `ProjectEntity`.
-    public init(context: ModelContext = {
-        ModelContext([ProjectEntity.self])
-    }()) {
+    public init(
+        context: ModelContext = {
+            let container = try! ModelContainer(for: [ProjectEntity.self])
+            return ModelContext(container: container)
+        }()
+    ) {
         self.context = context
     }
 
-    /// List all saved projects.
-    public func list() async throws -> [ProjectEntity] {
-        try context.fetch(FetchDescriptor<ProjectEntity>())
+    public func fetchAll() async throws -> [ProjectEntity] {
+        try await context.fetch(FetchDescriptor<ProjectEntity>())
     }
 
-    /// Create a new project with the given name at folder URL.
-    public func create(name: String, at folderURL: URL) async throws -> ProjectEntity {
-        let p = ProjectEntity(name: name, folderURL: folderURL)
-        context.insert(p)
+    public func save(_ project: ProjectEntity) async throws {
+        context.insert(project)
         try context.save()
-        return p
     }
 
-    /// Delete an existing project.
     public func delete(_ project: ProjectEntity) async throws {
         context.delete(project)
-        try context.save()
-    }
-
-    /// Rename a project.
-    public func rename(_ project: ProjectEntity, to newName: String) async throws {
-        project.name = newName
         try context.save()
     }
 }

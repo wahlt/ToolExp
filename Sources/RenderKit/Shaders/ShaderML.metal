@@ -6,28 +6,37 @@
 //
 
 #include <metal_stdlib>
-#include <metal_ml>
 using namespace metal;
-using namespace ml;
 
-/// Tiny embedded ML filter using Metal 4’s ml:: API.
-/// Expects a pre-compiled ML model in the default library.
+// A tiny in-shader CNN layer for color grading.
+//
+// This replaces the unavailable `<metal_ml>` header.
+// It performs a simple 3×3 blur-style convolution inline.
 
-kernel void shaderML(
-    device const float* inputData  [[buffer(0)]],
-    device float*       outputData [[buffer(1)]],
-    uint id [[thread_position_in_grid]]
+fragment half4 ml_colorEnhancer(
+    texture2d<half, access::read> inTexture [[texture(0)]],
+    sampler             s         [[sampler(0)]],
+    uint2               gid       [[thread_position_in_grid]]
 ) {
-    // 1. Wrap the raw pointer in an ML Tensor
-    auto inTensor  = graph::tensor({1, 64, 64, 3}, inputData);
-    auto outTensor = graph::tensor({1, 64, 64, 3});
+    half4 orig = inTexture.read(gid);
 
-    // 2. Load the tiny filter network by symbol name
-    auto model = graph::loadModel("tiny_filter");
+    // 3×3 convolution kernel
+    constexpr half kernel[3][3] = {
+        { 0.0, 0.1, 0.0 },
+        { 0.1, 0.6, 0.1 },
+        { 0.0, 0.1, 0.0 }
+    };
 
-    // 3. Enqueue the predict pass
-    model.predict(inTensor, outTensor);
+    half3 sum = half3(0.0);
+    for (uint yy = 0; yy < 3; yy++) {
+        for (uint xx = 0; xx < 3; xx++) {
+            uint2 coord = gid + uint2(xx - 1, yy - 1);
+            half4 sample = inTexture.read(coord);
+            sum += sample.rgb * kernel[yy][xx];
+        }
+    }
 
-    // 4. Write back the result
-    outTensor.read(outputData + id, 1);
+    // Mix original and filtered color 50/50
+    half3 blended = mix(orig.rgb, sum, half(0.5));
+    return half4(blended, orig.a);
 }

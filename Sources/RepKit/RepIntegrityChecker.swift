@@ -1,70 +1,57 @@
-//
-//  RepIntegrityChecker.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/16/25.
-//
-
-//
 // RepIntegrityChecker.swift
-// RepKit — Advanced integrity checks on a RepStruct.
-//
-// Ensures no cycles, no unreachable cells, etc.
-//
+// Detects cycles (and optionally unreachable cells) in a RepStruct.
 
 import Foundation
+import RepKit
 
-/// Errors thrown when integrity checks fail.
-public enum IntegrityError: Error, LocalizedError {
-    case cycleDetected(path: [RepID])
-    case unreachableCells([RepID])
-
-    public var errorDescription: String? {
-        switch self {
-        case .cycleDetected(let path):
-            return "Cycle detected: \(path)"
-        case .unreachableCells(let ids):
-            return "Unreachable cells found: \(ids)"
-        }
-    }
-}
-
-/// Performs deep consistency checks beyond `RepValidator`.
 public struct RepIntegrityChecker {
-    /// Checks for cycles and unreachable nodes.
-    /// - Parameter rep: the RepStruct to inspect.
-    /// - Returns: first `IntegrityError` found, or `nil` if fully integral.
-    public static func validate(_ rep: RepStruct) -> IntegrityError? {
-        // 1. Cycle detection via DFS with stack tracking.
-        var visited = Set<RepID>()
-        var stack   = [RepID]()
+    public enum IntegrityError: Error {
+        case cycleDetected([UUID])
+        case unreachableCells([UUID])
+    }
 
-        func dfs(_ id: RepID) -> IntegrityError? {
+    /// Throws if the Rep has a cycle (or unreachable cells, if enabled).
+    public static func check(rep: RepStruct) throws {
+        // 1) Cycle detection via DFS
+        var visited = Set<UUID>()
+        var stack   = [UUID]()
+
+        func dfs(_ id: UUID) -> IntegrityError? {
             if stack.contains(id) {
-                let cycleStart = stack.firstIndex(of: id)!
-                return .cycleDetected(path: Array(stack[cycleStart...] + [id]))
+                // cycle found
+                return .cycleDetected(stack + [id])
             }
-            guard !visited.contains(id) else { return nil }
+            if visited.contains(id) {
+                return nil
+            }
             visited.insert(id)
             stack.append(id)
-            for (_, neighbor) in rep.cells[id]?.ports ?? [:] {
-                if let err = dfs(neighbor) { return err }
+            defer { stack.removeLast() }
+
+            guard let cell = rep.cells[id] else { return nil }
+            let neighbors = cell.outgoingEdges.map(\.targetID)
+            for neigh in neighbors {
+                if let err = dfs(neigh) {
+                    return err
+                }
             }
-            stack.removeLast()
             return nil
         }
 
         for id in rep.cells.keys {
-            if let cycleErr = dfs(id) { return cycleErr }
+            if let err = dfs(id) {
+                throw err
+            }
         }
 
-        // 2. Unreachable detection: start from rep.id as root.
-        let reachable = Set(rep.depthFirst(from: rep.cells.keys.first!/*choose any*/).map(\.id))
+        // 2) Unreachable detection (commented until depthFirst is implemented)
+        /*
+        guard let root = rep.cells.keys.first else { return }
+        let reachable = Set(rep.depthFirst(from: root).map(\.id))
         let unreachable = Set(rep.cells.keys).subtracting(reachable)
         if !unreachable.isEmpty {
-            return .unreachableCells(Array(unreachable))
+            throw IntegrityError.unreachableCells(Array(unreachable))
         }
-
-        return nil
+        */
     }
 }
