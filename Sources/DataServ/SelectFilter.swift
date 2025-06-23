@@ -1,26 +1,34 @@
 //
 //  SelectFilter.swift
-//  ToolExp
+//  DataServ
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Provides generic map and filter for arrays.
+//  • Wraps standard sequence operations for uniform API.
 //
-
+//  Discussion:
+//  Having these helpers reduces boilerplate in UI code where
+//  one-liners can be concise and readable.
 //
-// SelectFilter.swift
-// DataServ — Cell selection and filtering APIs.
+//  Rationale:
+//  • Encourages use of functional collection transforms.
+//  • Maintains a single import point for common utilities.
 //
-// Simple value‐based filters over the `cells` dictionary.
+//  Dependencies: none (Foundation only)
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
 
-public extension RepStruct {
-    /// Return all cells whose labels satisfy the given predicate.
-    ///
-    /// - Parameter predicate: a `(Cell) -> Bool` closure.
-    /// - Returns: an array of cells matching the predicate.
-    func selectCells(where predicate: (Cell) -> Bool) -> [Cell] {
-        return cells.values.filter(predicate)
+public enum SelectFilter {
+    /// Filters an array by predicate.
+    public static func filter<T>(_ items: [T], by predicate: (T) -> Bool) -> [T] {
+        return items.filter(predicate)
+    }
+
+    /// Maps an array through transform.
+    public static func map<T, U>(_ items: [T], to transform: (T) -> U) -> [U] {
+        return items.map(transform)
     }
 }

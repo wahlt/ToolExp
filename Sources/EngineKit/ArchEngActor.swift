@@ -1,56 +1,51 @@
 //
 //  ArchEngActor.swift
-//  ToolExp
+//  EngineKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Actor that interprets high-level execution intents.
+//  • Routes each intent to the appropriate subsystem actor.
 //
-
+//  Discussion:
+//  Decouples intent dispatch from UI. Intents can represent
+//  physics updates, data queries, rendering commands, etc.
 //
-// ArchEngActor.swift
-// EngineKit — Architecture exploration actor.
+//  Rationale:
+//  • Actor enforces thread-safety for shared state.
+//  • Routing logic centralizes command handling.
 //
-// Uses trait‐based heuristics and pattern catalogs to propose
-// alternative Rep topologies (graph morphisms).
+//  Dependencies: RepKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import RepKit
 
-/// An actor that generates architectural variants of a Rep.
-public final class ArchEngActor {
-    /// Propose variants on the given Rep by applying each known pattern.
+public actor ArchEngActor {
+    public static let shared = ArchEngActor()
+
+    /// Dispatches an intent by name to subsystem actors.
     ///
-    /// - Parameter rep: the original `RepStruct`.
-    /// - Returns: an array of new `RepStruct` instances,
-    ///   each transformed according to one architectural pattern.
-    public func proposeVariants(of rep: RepStruct) -> [RepStruct] {
-        // 1) Fetch catalog of patterns
-        let patterns = ArchEngDescriptor.availablePatterns()
-
-        // 2) For each pattern, apply its transformation
-        return patterns.map { pattern in
-            apply(pattern: pattern, to: rep)
-        }
-    }
-
-    /// Internal helper to apply a single pattern.
-    private func apply(pattern: ArchPattern, to rep: RepStruct) -> RepStruct {
-        var modified = rep
-
-        switch pattern.name {
-        case "Layered":
-            // TODO: reorganize nodes into sorted layers based on depth
+    /// - Parameters:
+    ///   - intent: E.g. "physics", "data", "render".
+    ///   - payload: Optional context-specific data.
+    public func handle(intent: String, payload: Any?) async throws {
+        switch intent {
+        case "physics":
+            try await RepMechActor.shared.apply(payload)
+        case "data":
+            // Future: DataServActor.shared.query(payload)
             break
-        case "HubAndSpoke":
-            // TODO: pick highest‐degree node as hub, connect all others
+        case "render":
+            // Future: RepRenderer.shared.render(payload)
             break
         default:
-            // Unknown pattern: return rep unmodified
-            break
+            throw NSError(
+                domain: "EngineKit.ArchEngActor",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Unknown intent \(intent)"]
+            )
         }
-
-        // Update the name to reflect the variant
-        modified.name = "\(rep.name)-\(pattern.name)"
-        return modified
     }
 }

@@ -1,49 +1,38 @@
 //
-//  RenderAdaptor.swift
-//  ToolExp
+//  RenderAdapter.swift
+//  RenderKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Bridges EngineKit.ArtEngine outputs into RenderKit pipelines.
+//  • Converts scene graphs into mesh & material descriptors.
 //
-
+//  Discussion:
+//  ArtEngine focuses on scene logic; RenderAdapter translates that
+//  into GPU commands for RepRenderer, RendEng, or DynamicFallbackRenderer.
 //
-// RenderAdapter.swift
-// RenderKit — Bridges MetalKit’s MTKView with our Renderer API.
-//
-// Responsibilities:
-//  • Set up `MTKViewDelegate` to call `Renderer.render(_:in:)`.
-//  • Manage drawable resizing and depth/stencil textures.
-//  • Provide a single `Renderer` protocol for callers.
+//  Rationale:
+//  • Decouples scene construction from rendering implementation.
+//  Dependencies: EngineKit, MetalKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import MetalKit
-import RepKit
+import EngineKit
 
-/// Unified renderable interface.
-public protocol Renderer {
-    /// Draw the given Rep into the MTKView’s current drawable.
-    func render(_ rep: RepStruct, in view: MTKView)
-}
+public class RenderAdapter {
+    private let device: MTLDevice
 
-/// MTKViewDelegate that delegates to our `Renderer`.
-public final class RenderAdapter: NSObject, MTKViewDelegate {
-    private let renderer: Renderer
-    private let view: MTKView
-
-    public init(renderer: Renderer, view: MTKView) {
-        self.renderer = renderer
-        self.view = view
-        super.init()
-        view.delegate = self
-        view.depthStencilPixelFormat = .depth32Float
+    public init(device: MTLDevice) {
+        self.device = device
     }
 
-    public func draw(in view: MTKView) {
-        guard let rep = ToolShared.currentRep else { return }
-        renderer.render(rep, in: view)
-    }
-
-    public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        // TODO: update camera/projection matrices
+    /// Converts an `ArtScene` into drawable primitives.
+    public func adapt(scene: ArtScene) -> [RenderableMesh] {
+        // 1) Traverse scene.nodes
+        // 2) Extract mesh data & transforms
+        // 3) Package into RenderableMesh structs
+        return []  // Placeholder: real conversion logic needed
     }
 }

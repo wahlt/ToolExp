@@ -6,15 +6,39 @@
 //
 
 // MLXTensor.swift
+// MLXIntegration — Represents a tensor as a Metal texture.
+
 import Metal
 
-/// Represents a tensor backed by a GPU buffer or texture.
 public struct MLXTensor {
-  public let device: MTLDevice
-  public let buffer: MTLBuffer
+    public let texture: MTLTexture
+    public let shape: [Int]
 
-  public init(device: MTLDevice, length: Int) {
-    self.device = device
-    self.buffer = device.makeBuffer(length: length, options: [])!
-  }
+    /// Wrap an existing MTLTexture as a tensor.
+    public init(texture: MTLTexture, shape: [Int]) {
+        self.texture = texture
+        self.shape = shape
+    }
+
+    /// Allocate a new 1D or 2D tensor on `device`.
+    public init(
+        device: MTLDevice,
+        shape: [Int],
+        pixelFormat: MTLPixelFormat = .r32Float,
+        usage: MTLTextureUsage = [.shaderRead, .shaderWrite]
+    ) {
+        self.shape = shape
+        let desc = MTLTextureDescriptor()
+        desc.pixelFormat = pixelFormat
+        desc.usage = usage
+
+        // Support 1D (shape = [N]) or 2D ([W, H])
+        desc.width = shape[0]
+        desc.height = shape.count > 1 ? shape[1] : 1
+
+        guard let tex = device.makeTexture(descriptor: desc) else {
+            fatalError("MLXTensor: failed to create texture for shape \(shape)")
+        }
+        self.texture = tex
+    }
 }

@@ -1,34 +1,37 @@
 //
 //  ModuleMng+AppleAssets.swift
-//  ToolExp
+//  IntegrationKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Extension to load module-specific assets from app bundle.
+//  • Supports images, JSON, and shader files.
 //
-
+//  Discussion:
+//  Kits with bundled resources can register their asset catalogs here.
 //
-// ModuleMng+AppleAssets.swift
-// IntegrationKit — Enables downloading & installing Apple-hosted asset bundles.
+//  Rationale:
+//  • Avoids boilerplate Bundle lookups.
+//  Dependencies: UIKit, Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
+import UIKit
 
 public extension ModuleMng {
-    /// Download and install an asset bundle from Apple’s CDN.
-    ///
-    /// - Parameter url: The HTTPS URL of the .zip asset bundle.
-    /// - Throws: on network or file‐system errors.
-    func installAppleAsset(from url: URL) async throws {
-        // 1. Download data
-        let (data, _) = try await URLSession.shared.data(from: url)
-        // 2. Unzip into your Modules folder
-        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        //    (Use Archive framework or SSZipArchive)
-        // TODO: unzip `data` into `tempDir`
-        // 3. Load each plugin module from `tempDir`
-        let pluginURLs = try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
-        for plugin in pluginURLs where plugin.pathExtension == "bundle" {
-            try loadModule(at: plugin)
+    /// Loads an image asset for the given module.
+    func loadImage(_ name: String, inModule module: String) -> UIImage? {
+        guard let bundle = Bundle(identifier: module) else { return nil }
+        return UIImage(named: name, in: bundle, compatibleWith: nil)
+    }
+
+    /// Loads JSON text for the given module.
+    func loadJSON(_ filename: String, inModule module: String) -> String? {
+        guard let bundle = Bundle(identifier: module),
+              let url = bundle.url(forResource: filename, withExtension: "json") else {
+            return nil
         }
+        return try? String(contentsOf: url)
     }
 }

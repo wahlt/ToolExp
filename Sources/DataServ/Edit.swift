@@ -1,61 +1,31 @@
 //
 //  Edit.swift
-//  ToolExp
+//  DataServ
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Applies an inout mutation to a copy of a value and returns it.
+//  • Allows functional-style updates of immutable structs.
 //
-
+//  Discussion:
+//  Immutable data models benefit from copy-on-write mutations.
+//  This helper avoids boilerplate “var x = original; mutate; return x.”
 //
-// Edit.swift
-// DataServ — In-place Rep editing (rename, data updates).
+//  Rationale:
+//  • Encourages value-type usage.
+//  • Simplifies code that transforms model instances.
 //
-// Offers convenience methods on `RepStruct` that return
-// new immutable blooms with the requested edit applied.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
 
-public extension RepStruct {
-    /// Return a new Rep with the specified cell renamed.
-    ///
-    /// - Parameters:
-    ///   - id: the `RepID` of the cell to rename.
-    ///   - newLabel: the replacement label.
-    /// - Throws: `RepError.cellNotFound` if the ID is missing.
-    func renaming(cell id: RepID, to newLabel: String) throws -> RepStruct {
-        // 1) Ensure the cell exists
-        guard let oldCell = cells[id] else {
-            throw RepError.cellNotFound(id)
-        }
-
-        // 2) Make a copy of the Rep and the target Cell
-        var copy = self
-        var updatedCell = oldCell
-
-        // 3) Apply the label change
-        updatedCell.label = newLabel
-
-        // 4) Store back into the dictionary
-        copy.cells[id] = updatedCell
-        return copy
-    }
-
-    /// Return a new Rep with the specified cell’s data replaced.
-    ///
-    /// - Parameters:
-    ///   - cellID: the `RepID` of the cell to update.
-    ///   - newData: the new `AnyCodable` payload.
-    /// - Throws: `RepError.cellNotFound` if the cell is missing.
-    func updatingData(of cellID: RepID, to newData: AnyCodable) throws -> RepStruct {
-        guard let oldCell = cells[cellID] else {
-            throw RepError.cellNotFound(cellID)
-        }
-
-        var copy = self
-        var updatedCell = oldCell
-        updatedCell.data = newData
-        copy.cells[cellID] = updatedCell
+public enum Edit {
+    /// Returns a mutated copy of the original value.
+    public static func mutated<T>(_ original: T, using block: (inout T) -> Void) -> T {
+        var copy = original
+        block(&copy)
         return copy
     }
 }

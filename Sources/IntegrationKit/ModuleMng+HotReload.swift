@@ -1,41 +1,37 @@
 //
 //  ModuleMng+HotReload.swift
-//  ToolExp
+//  IntegrationKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Watches folders for code/resource changes and reloads modules.
+//  • Uses DispatchSourceFileSystemObject for file-watching.
 //
-
+//  Discussion:
+//  During development, hot-reload speeds iteration for ToolExp.
 //
-// ModuleMng+HotReload.swift
-// IntegrationKit — Watches the Modules directory and hot‐reloads on change.
+//  Rationale:
+//  • Improves developer velocity.
+//  Dependencies: Dispatch, Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
 public extension ModuleMng {
-    /// Begins watching your Modules folder for additions/removals.
-    ///
-    /// - Parameter modulesURL: local URL of your Modules directory.
-    /// - Throws: if the directory cannot be monitored.
-    func enableHotReload(in modulesURL: URL) throws {
-        // 1. Open a file descriptor for FSEvents
-        let fd = open(modulesURL.path, O_EVTONLY)
-        guard fd >= 0 else { throw NSError(domain: "ModuleMng", code: 2) }
-        // 2. Create a DispatchSourceFileSystemObject
+    /// Starts watching a folder for changes.
+    func watch(folderURL: URL) {
+        let fd = open(folderURL.path, O_EVTONLY)
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: .write,
-            queue: .main
+            queue: DispatchQueue.global()
         )
         source.setEventHandler { [weak self] in
-            // 3. On any change, rescan and reload
-            Task {
-                let contents = try? FileManager.default.contentsOfDirectory(at: modulesURL, includingPropertiesForKeys: nil)
-                for url in contents ?? [] where url.pathExtension == "bundle" {
-                    try? self?.loadModule(at: url)
-                }
-            }
+            self?.modules.removeAll()
+            // TODO: Scan folderURL for updated bundles
         }
+        source.setCancelHandler { close(fd) }
         source.resume()
     }
 }

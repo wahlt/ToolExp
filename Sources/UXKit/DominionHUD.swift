@@ -5,15 +5,10 @@
 //  Created by Thomas Wahl on 6/16/25.
 //
 
-//
-// DominionHUD.swift
-// UXKit — Heads-up display for active Agent & quick commands.
-//
-// Shows current agent, subgraph context, available quick actions.
-//
-
 import SwiftUI
+import StageKit   // for StageMng, Dominion & Stage
 
+/// Heads-up display of current Dominion & Stage.
 public struct DominionHUD: View {
     @EnvironmentObject var stageMng: StageMng
 

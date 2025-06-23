@@ -1,41 +1,37 @@
 //
 //  ArchEngDescriptor.swift
-//  ToolExp
+//  EngineKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Describes engine actor capabilities and versions.
+//  • Used for discovery and compatibility checks.
 //
-
+//  Discussion:
+//  When orchestrating multi-agent workflows, knowing each
+//  actor’s supported intents and version aids coordination.
 //
-// ArchEngDescriptor.swift
-// EngineKit — Describes architectural patterns for Reps.
+//  Rationale:
+//  • Static descriptor avoids hardcoding strings in multiple places.
+//  • Facilitates dynamic loading of new actors/plugins.
 //
-// Maintains a registry of named graph‐transformation patterns.
+//  Dependencies: none (Foundation only)
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// A named architecture pattern with a human‐readable description.
-public struct ArchPattern {
-    /// Unique name identifier for the pattern.
-    public let name: String
-    /// A short description of what the pattern does.
-    public let description: String
-}
-
-/// Descriptor providing access to built‐in patterns.
 public struct ArchEngDescriptor {
-    /// List all available patterns.
-    public static func availablePatterns() -> [ArchPattern] {
-        return [
-            ArchPattern(
-                name: "Layered",
-                description: "Organize nodes into sequential layers by hop‐distance."
-            ),
-            ArchPattern(
-                name: "HubAndSpoke",
-                description: "Designate one node as hub and connect all others as its spokes."
-            ),
-            // TODO: Add more advanced patterns (Tree, Mesh, Modular, etc.)
-        ]
+    public let name: String
+    public let version: String
+    public let supportedIntents: [String]
+
+    /// Default descriptor for ArchEngActor.
+    public static var `default`: ArchEngDescriptor {
+        ArchEngDescriptor(
+            name: "ArchEngActor",
+            version: "1.0.0",
+            supportedIntents: ["physics", "data", "render"]
+        )
     }
 }

@@ -1,54 +1,39 @@
 //
 //  RepReloadServ.swift
-//  ToolExp
+//  ServiceKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Reloads Rep graphs from JSON or remote sources.
+//  • Posts notification upon completion for UI to update.
 //
-
+//  Discussion:
+//  Useful for live-coding and hot-swap demos in ToolDev.
 //
-// RepReloadServ.swift
-// ServiceKit — Watches a folder for `.rep` files and reloads at runtime.
+//  Rationale:
+//  • Decouple reload logic from controllers.
+//  • NotificationCenter ensures loose coupling.
 //
-// (Reprinted here to ensure you have the latest edition.)
+//  Dependencies: Foundation, RepKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
+import RepKit
 
-public extension Notification.Name {
-    static let didReloadRep = Notification.Name("didReloadRep")
-}
-
-public final class RepReloadServ {
+public class RepReloadServ {
     public static let shared = RepReloadServ()
-    private var watcher: DispatchSourceFileSystemObject?
-
     private init() {}
 
-    /// Start watching the given directory for `.rep` files.
-    public func watch(directory url: URL) throws {
-        let fd = open(url.path, O_EVTONLY)
-        guard fd >= 0 else { throw NSError(domain: "RepReloadServ", code: 1) }
-        watcher = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fd,
-            eventMask: .write,
-            queue: .global()
-        )
-        watcher?.setEventHandler { [weak self] in
-            self?.reloadAll(from: url)
-        }
-        watcher?.resume()
-    }
+    public static let reloadNotification = Notification.Name("RepReloaded")
 
-    /// Load all `.rep` files in the directory and post notifications.
-    private func reloadAll(from url: URL) {
-        let files = (try? FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: nil
-        )) ?? []
-
-        for file in files where file.pathExtension == "rep" {
-            // TODO: parse into RepStruct then:
-            // NotificationCenter.default.post(name: .didReloadRep, object: rep)
+    /// Reloads a rep from JSON data and notifies observers.
+    public func reload(repID: UUID, from data: Data) {
+        if let rep = try? RepSerializer.fromJSON(data) {
+            Task {
+                await RepStructStore.shared.updateCells(repID: repID, cells: rep.cells)
+                NotificationCenter.default.post(name: RepReloadServ.reloadNotification, object: repID)
+            }
         }
     }
 }

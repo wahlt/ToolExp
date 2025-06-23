@@ -1,40 +1,30 @@
 //
 //  AIKit.swift
-//  ToolExp
+//  AIKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Central registry for AI services in Tool.
+//  • Exposes mentor, summarizer, and future AI utilities via static properties.
 //
-
+//  Discussion:
+//  Bundling AI entry points under one namespace simplifies imports
+//  and signals that these are core AI capabilities of Tool.
 //
-// AIKit.swift
-// AIKit — Core AI service definitions and utilities.
+//  Rationale:
+//  • Enforces consistency when adding new AI helpers.
+//  • Avoids scattered singleton references across modules.
 //
-// Defines shared adaptor protocols and a facade over BridgeKit’s adaptors.
+//  Dependencies: AIMentor
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import BridgeKit
 
-/// Central interface to any AI back-end.
-public protocol AIService {
-    /// Send a completion request to the AI.
-    /// - Parameters:
-    ///   - prompt: the human-readable prompt.
-    ///   - maxTokens: maximum length of the response.
-    /// - Returns: the AI’s text response.
-    func complete(prompt: String, maxTokens: Int) async throws -> String
-}
+public enum AIKit {
+    /// Context-sensitive mentor.
+    public static var mentor: AIMentor { AIMentor.shared }
 
-/// Default AIService implementation backed by OpenAI.
-public struct DefaultAIService: AIService {
-    private let adaptor: OpenAIAdaptor
-
-    public init(adaptor: OpenAIAdaptor = .shared) {
-        self.adaptor = adaptor
-    }
-
-    public func complete(prompt: String, maxTokens: Int) async throws -> String {
-        // Forward directly to the OpenAI adaptor.
-        return try await adaptor.complete(prompt: prompt, maxTokens: maxTokens)
-    }
+    // Future expansions:
+    // public static var summarizer: AISummarizer { ... }
 }

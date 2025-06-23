@@ -1,38 +1,43 @@
 //
 //  SwiftBuild.swift
-//  ToolExp
+//  BuildKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Programmatic access to SwiftPM manifests and dependency graphs.
+//  • Parses `Package.swift` via SwiftSyntax for introspection.
 //
-
+//  Discussion:
+//  Tool can expose module dependencies dynamically by
+//  parsing the manifest. This aids auto-completion and scaffolding.
 //
-// SwiftBuild.swift
-// BuildKit — Wrapper over SwiftPM CLI for builds and tests.
+//  Rationale:
+//  • SwiftSyntax-based parsing avoids brittle string hacks.
+//  • Exposing manifest AST enables future plugin systems.
+//
+//  Dependencies: SwiftSyntax, SwiftSyntaxParser
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
+import SwiftSyntax
+import SwiftSyntaxParser
 
-/// Executes SwiftPM build/test commands programmatically.
-public struct SwiftBuild {
-    /// Run `swift build` in the given directory.
-    public func run(in packagePath: URL) async throws {
-        try await run(command: ["swift", "build"], in: packagePath)
+public class SwiftBuild {
+    /// Reads the raw text of `Package.swift`.
+    public func manifest(at packagePath: String) throws -> String {
+        let url = URL(fileURLWithPath: packagePath).appendingPathComponent("Package.swift")
+        return try String(contentsOf: url)
     }
 
-    /// Helper to spawn a process and await its exit.
-    private func run(command: [String], in cwd: URL) async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = command
-        process.currentDirectoryURL = cwd
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw NSError(
-                domain: "SwiftBuild",
-                code: Int(process.terminationStatus),
-                userInfo: [NSLocalizedDescriptionKey: "Command \(command) failed"]
-            )
+    /// Parses the manifest into a `SourceFileSyntax` tree.
+    public func parseManifest(at packagePath: String) throws -> SourceFileSyntax {
+        let text = try manifest(at: packagePath)
+        let tree = try SyntaxParser.parse(source: text)
+        guard let file = tree as? SourceFileSyntax else {
+            throw NSError(domain: "SwiftBuild", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Unable to parse manifest"])
         }
+        return file
     }
 }

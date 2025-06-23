@@ -6,22 +6,25 @@
 //
 
 // swift-tools-version:6.2
-import PackageDescription
+// MLXModel.swift
+// MLXIntegration — Wraps a compiled CoreML model for GPU inference.
 
-let package = Package(
-  name: "MLX.swift",
-  platforms: [
-    .iOS(.v17),    // iPadOS 26 → SDK iOS17
-    .macOS(.v15)
-  ],
-  products: [
-    .library(name: "MLXIntegration", targets: ["MLXIntegration"])
-  ],
-  dependencies: [ /* none */ ],
-  targets: [
-    .target(
-      name: "MLXIntegration",
-      dependencies: []
-    )
-  ]
-)
+import Foundation
+import CoreML
+
+public final class MLXModel {
+    private let mlModel: MLModel
+    public let inputNames: [String]
+    public let outputNames: [String]
+
+    /// Load a compiled `.mlmodelc` at `modelURL`.
+    public init(compiledModelURL: URL) throws {
+        self.mlModel = try MLModel(contentsOf: compiledModelURL)
+        let desc = mlModel.modelDescription
+        self.inputNames = Array(desc.inputDescriptionsByName.keys)
+        self.outputNames = Array(desc.outputDescriptionsByName.keys)
+    }
+
+    /// The underlying CoreML model (for advanced uses).
+    internal var coreMLModel: MLModel { mlModel }
+}

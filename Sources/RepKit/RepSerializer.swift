@@ -1,54 +1,31 @@
 //
 //  RepSerializer.swift
-//  ToolExp
+//  RepKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Serializes RepStruct data to/from JSON Data.
+//  • Uses JSONEncoder/Decoder with pretty‐print.
 //
-
+//  Discussion:
+//  Useful for export/import, network sync, and persistence.
 //
-// RepSerializer.swift
-// RepKit — JSON import/export for RepStruct.
-//
-// Relies on Codable synthesis of Cell and AnyCodable.
+//  Rationale:
+//  • Standard JSON pipeline guarantees interoperability.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Errors during serialization or deserialization.
-public enum SerializationError: Error, LocalizedError {
-    case invalidJSONString
-    case decodingFailed(Error)
-
-    public var errorDescription: String? {
-        switch self {
-        case .invalidJSONString:
-            return "Produced JSON string is invalid."
-        case .decodingFailed(let err):
-            return "Decoding failed: \(err)"
-        }
-    }
-}
-
-/// Converts `RepStruct` to/from JSON for interchange.
-public struct RepSerializer {
-    /// Encode a `RepStruct` to pretty‐printed JSON.
-    public static func toJSON(_ rep: RepStruct) throws -> String {
+public enum RepSerializer {
+    public static func toJSON(_ rep: RepStruct) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(rep)
-        guard let str = String(data: data, encoding: .utf8) else {
-            throw SerializationError.invalidJSONString
-        }
-        return str
+        return try encoder.encode(rep)
     }
 
-    /// Decode a `RepStruct` from JSON.
-    public static func fromJSON(_ json: String) throws -> RepStruct {
-        let data = Data(json.utf8)
-        do {
-            return try JSONDecoder().decode(RepStruct.self, from: data)
-        } catch {
-            throw SerializationError.decodingFailed(error)
-        }
+    public static func fromJSON(_ data: Data) throws -> RepStruct {
+        return try JSONDecoder().decode(RepStruct.self, from: data)
     }
 }

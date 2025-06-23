@@ -1,65 +1,50 @@
 //
 //  FacetServ.swift
-//  ToolExp
+//  ServiceKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Registers and retrieves available FacetEntity instances.
+//  • Caches icon images for fast HUD rendering.
 //
-
+//  Discussion:
+//  HUDOverlayManager queries FacetServ for facets to display.
+//  Preloading icons reduces flicker.
 //
-// FacetServ.swift
-// ServiceKit — Manage IconFacet entities & hot-swap backing Reps.
+//  Rationale:
+//  • Central registry simplifies facet management across SuperStages.
+//  • UIImage cache avoids redundant disk loads.
 //
-// Uses SwiftData to persist Facet → RepID mappings and loads Reps via DataServ.
+//  Dependencies: UIKit, RepKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import SwiftData
+import UIKit
 import RepKit
 
-@Model
-public class FacetEntity {
-    @Attribute(.unique) public var id: String    // e.g. "icon-user", "icon-settings"
-    public var repID: UUID                       // which Rep backs this facet
+public class FacetServ {
+    public static let shared = FacetServ()
+    private var facets:    [UUID: FacetEntity] = [:]
+    private var iconCache: [String: UIImage]  = [:]
 
-    public init(id: String, repID: UUID) {
-        self.id = id
-        self.repID = repID
-    }
-}
+    private init() {}
 
-/// Service actor for registering & resolving Facets.
-public actor FacetServ {
-    private let context: ModelContext
-    private let dataServ: DataServ
-
-    public init(context: ModelContext = {
-        ModelContext([FacetEntity.self])
-    }(), dataServ: DataServ = .init()) {
-        self.context = context
-        self.dataServ = dataServ
+    /// Registers a new facet.
+    public func register(_ facet: FacetEntity) {
+        facets[facet.id] = facet
     }
 
-    /// Assign a Rep to a named Facet.
-    public func register(facet id: String, repID: UUID) async throws {
-        // Delete old mapping if exists
-        if let old = try context.fetch(
-            FetchDescriptor<FacetEntity>(matching: #Predicate { $0.id == id })
-        ).first {
-            context.delete(old)
-        }
-        // Insert new
-        let entity = FacetEntity(id: id, repID: repID)
-        context.insert(entity)
-        try context.save()
+    /// Returns all registered facets.
+    public func allFacets() -> [FacetEntity] {
+        return Array(facets.values)
     }
 
-    /// Resolve a Facet’s current RepStruct.
-    public func resolve(facet id: String) async throws -> RepStruct {
-        guard let entity = try context.fetch(
-            FetchDescriptor<FacetEntity>(matching: #Predicate { $0.id == id })
-        ).first else {
-            throw NSError(domain: "FacetServ", code: 404)
-        }
-        return try await dataServ.load(id: entity.repID)
+    /// Loads or returns cached icon for a facet.
+    public func icon(for facet: FacetEntity) -> UIImage? {
+        if let img = iconCache[facet.iconName] { return img }
+        let img = UIImage(named: facet.iconName)
+        iconCache[facet.iconName] = img
+        return img
     }
 }

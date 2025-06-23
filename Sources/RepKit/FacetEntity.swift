@@ -1,38 +1,33 @@
 //
 //  FacetEntity.swift
-//  ToolExp
+//  RepKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Represents a UI facet bound to a Rep cell or group.
+//  • Holds icon, label, and interaction metadata.
 //
-
+//  Discussion:
+//  Facets drive HUD overlays—e.g. “Traverse,” “Inspect,” etc.
 //
-// FacetEntity.swift
-// RepKit — Defines an Icon‐Facet model backing a UI slot.
-//
-// Each “facet” (UI icon) can be bound at runtime to a `RepStruct`,
-// letting you hot‐swap content without rebuilding in Xcode.
+//  Rationale:
+//  • Decouple UI descriptors from core Rep data.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import SwiftData
 
-/// SwiftData model for a UI icon facet.
-@Model
-public class FacetEntity {
-    /// Unique SwiftData ID for this facet slot.
-    @Attribute(.unique) public var id: UUID
-    /// Logical name (e.g. “BrushPalette”, “GravityForge”).
-    public var name: String
-    /// The backing RepStruct’s ID (in DataServ) for this facet.
-    public var repBackingID: UUID?
+public struct FacetEntity: Codable, Equatable {
+    public let id: UUID
+    public let name: String
+    public let iconName: String
+    public let tooltip: String
 
-    public init(
-        id: UUID = .init(),
-        name: String,
-        repBackingID: UUID? = nil
-    ) {
-        self.id = id
+    public init(name: String, iconName: String, tooltip: String) {
+        self.id = UUID()
         self.name = name
-        self.repBackingID = repBackingID
+        self.iconName = iconName
+        self.tooltip = tooltip
     }
 }

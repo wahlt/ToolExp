@@ -1,56 +1,44 @@
 //
 //  Cell.swift
-//  ToolExp
+//  RepKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Fundamental unit of Rep: uniquely identified, stores metadata,
+//    ports to other cells, and optional spatial properties.
 //
-
+//  Discussion:
+//  Cells form the nodes of Rep graphs. They carry arbitrary
+//  key/value data and connection ports mapping names→cellIDs.
 //
-// Cell.swift
-// RepKit — Value-type graph node representing a single cell.
-// Switched from class to struct for value semantics & Sendable conformance.
+//  Rationale:
+//  • Keep minimal to allow extension via traits or facets.
+//  • Codable for JSON‐based persistence and network sync.
+//
+//  Dependencies: Foundation, simd
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
+import simd
 
-/// Unique identifier for cells & reps.
-public typealias RepID = UUID
+public struct Cell: Codable, Equatable {
+    public let id: UUID
+    public var data: [String: AnyCodable]
+    public var ports: [String: UUID]
+    public var position: SIMD3<Float>
+    public var velocity: SIMD3<Float>
 
-/// Protocol for a graph node in a RepStruct.
-public protocol CellProtocol: Codable, Hashable, Sendable {
-    /// Globally unique cell ID.
-    var id: RepID { get }
-    /// Short textual label for display.
-    var label: String { get set }
-    /// Arbitrary payload.
-    var data: AnyCodable { get set }
-    /// Named ports mapping to other cell IDs.
-    var ports: [String: RepID] { get set }
-}
-
-/// Concrete, Codable, Hashable, Sendable cell.
-public struct Cell: CellProtocol {
-    public let id: RepID
-    public var label: String
-    public var data: AnyCodable
-    public var ports: [String: RepID]
-
-    /// Create a new Cell.
-    ///
-    /// - Parameters:
-    ///   - id:    optional custom UUID (default new).
-    ///   - label: display name for the cell.
-    ///   - data:  payload, default empty.
-    ///   - ports: edge map, default empty.
-    public init(
-        id: RepID = RepID(),
-        label: String,
-        data: AnyCodable = AnyCodable(()),
-        ports: [String: RepID] = [:]
-    ) {
+    public init(id: UUID = UUID(),
+                data: [String: AnyCodable] = [:],
+                ports: [String: UUID] = [:],
+                position: SIMD3<Float> = .zero,
+                velocity: SIMD3<Float> = .zero)
+    {
         self.id = id
-        self.label = label
         self.data = data
         self.ports = ports
+        self.position = position
+        self.velocity = velocity
     }
 }

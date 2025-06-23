@@ -1,68 +1,73 @@
 //
 //  ArtEngine.swift
-//  ToolExp
+//  EngineKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Hybrid rendering engine combining MetalKit & RealityKit.
+//  • Manages render pipelines and draws each frame.
 //
-
+//  Discussion:
+//  Tool needs both high-fidelity 3D and UI overlays.
+//  ArtEngine centralizes setup for both rendering contexts.
 //
-// ArtEngine.swift
-// EngineKit — Asset creation & procedural generation actor.
+//  Rationale:
+//  • Reusing one engine avoids divergent code paths.
+//  • MetalKit for shaders; RealityKit for AR anchoring.
 //
-// Handles importing/exporting standard 3D formats, PBR baking,
-// procedural brush strokes, and voxel/mesh sculpting.
+//  Dependencies: MetalKit, RealityKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
 import MetalKit
+import RealityKit
 
-public final class ArtEngine {
+public class ArtEngine {
+    private let mtkView: MTKView
+    private let arView: ARView
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
 
-    /// Initialize with the given Metal device.
-    public init(device: MTLDevice = MTLCreateSystemDefaultDevice()!) {
-        self.device = device
-        self.commandQueue = device.makeCommandQueue()!
+    /// Initializes with MetalKit and RealityKit views.
+    public init(mtkView: MTKView, arView: ARView) {
+        guard let dev = MTLCreateSystemDefaultDevice() else {
+            fatalError("Metal device unavailable")
+        }
+        self.device = dev
+        self.commandQueue = dev.makeCommandQueue()!
+        self.mtkView = mtkView
+        self.arView = arView
+        configure()
     }
 
-    // MARK: — Import / Export
+    /// Shared pipeline setup for both views.
+    private func configure() {
+        // Configure MetalKit view.
+        mtkView.device = device
+        mtkView.preferredFramesPerSecond = 60
+        mtkView.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
 
-    /// Import a USDZ file into a `RepStruct` representing its scene graph.
-    public func importUSDZ(url: URL) throws -> RepStruct {
-        // TODO: Use ModelIO/RealityKit to parse USDZ, convert to RepStruct cells and ports.
-        return RepStruct(name: url.deletingPathExtension().lastPathComponent)
+        // Configure RealityKit ARView.
+        arView.environment.background = .color(.black)
+        arView.scene.anchors.removeAll()
     }
 
-    /// Export a `RepStruct` as a GLTF file.
-    public func exportGLTF(rep: RepStruct, to url: URL) throws {
-        // TODO: Traverse RepStruct, build scene, use GLTFWriter or ModelIO.
+    /// Renders a single frame to Metal and AR contexts.
+    public func renderFrame() {
+        // Step 1: Metal draw call.
+        guard let drawable = mtkView.currentDrawable,
+              let descriptor = mtkView.currentRenderPassDescriptor else {
+            return
+        }
+        let cmdBuf = commandQueue.makeCommandBuffer()!
+        let encoder = cmdBuf.makeRenderCommandEncoder(descriptor: descriptor)!
+        // Actual draw calls would bind pipelines, set buffers, etc.
+        encoder.endEncoding()
+        cmdBuf.present(drawable)
+        cmdBuf.commit()
+
+        // Step 2: RealityKit updates internally.
+        // (Scene updates handled automatically each frame.)
     }
-
-    // MARK: — PBR Baking
-
-    /// Bake lighting into texture maps for the given Rep’s mesh assets.
-    public func bakePBR(rep: RepStruct) throws {
-        // TODO: Iterate mesh cells, run offscreen Metal pass to bake albedo/normal/roughness.
-    }
-
-    // MARK: — Procedural Brushes
-
-    /// Apply a procedural stroke to the Rep (e.g. ink, watercolor, noise).
-    public func applyBrush(
-        rep: RepStruct,
-        at position: SIMD3<Float>,
-        brush: BrushParameters
-    ) throws -> RepStruct {
-        // TODO: Sample existing mesh or canvas cell, modify via compute shader.
-        return rep
-    }
-}
-
-/// Example parameters for a procedural brush.
-public struct BrushParameters {
-    public var size: Float       // diameter in world units
-    public var intensity: Float  // 0.0 – 1.0
-    public var color: SIMD4<Float> // RGBA
 }

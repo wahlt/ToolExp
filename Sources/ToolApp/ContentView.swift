@@ -1,40 +1,33 @@
 //
 //  ContentView.swift
-//  ToolExp
+//  ToolApp
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Root view that switches between SuperStage views.
 //
-
+//  Discussion:
+//  Listens to coordinator.currentStage and displays appropriate UI.
 //
-// ContentView.swift
-// ToolApp — Root SwiftUI view with FourPaneLayout & gesture overlay.
+//  Rationale:
+//  • Single source for stage switching.
+//  Dependencies: SwiftUI
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import SwiftUI
-import StageKit
-import UXKit
 
-struct ContentView: View {
-    @EnvironmentObject var stageMng: StageMng
+public struct ContentView: View {
+    @EnvironmentObject var coordinator: ToolAppCoordinator
 
-    var body: some View {
-        HSplitView {
-            // Dominion selector
-            DominionView()
-                .frame(minWidth: 200)
-                .border(Color.gray)
-
-            // Four-pane tool UI
-            FourPaneLayout {
-                CarouselView()
-                PropagateView()
-                CraftView()
-                TrialView()
+    public var body: some View {
+        Group {
+            switch coordinator.currentStage {
+            case "ToolExp":  HelloWorldView()
+            default:         HelloWorldView()
             }
         }
-        .onAppear { stageMng.loadDefaultRep() }
-        // Overlay gesture & performance indicators
-        .overlay(GestureIndicatorOverlay())
-        .overlay(FPSCounterOverlay())
     }
 }
+
+

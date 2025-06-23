@@ -5,15 +5,13 @@
 //  Created by Thomas Wahl on 6/16/25.
 //
 
-//
-// GestureIndicatorOverlay.swift
-// UXKit — Displays current gesture & all parameters.
-//
-
 import SwiftUI
 
+/// Overlay view that shows the current gesture & parameters.
 public struct GestureIndicatorOverlay: View {
     @StateObject private var indicator = GestureIndicator.shared
+
+    public init() {}  // explicit for Swift 6.2
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {

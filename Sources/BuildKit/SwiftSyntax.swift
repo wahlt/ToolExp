@@ -1,29 +1,38 @@
 //
 //  SwiftSyntax.swift
-//  ToolExp
+//  BuildKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Helpers to construct or transform SwiftSyntax nodes.
+//  • Emits syntax trees that can be written back to disk.
 //
-
+//  Discussion:
+//  When generating code (e.g. new modules), DSL-based node builders
+//  reduce errors compared to string templates.
 //
-// SwiftSyntax.swift
-// BuildKit — Scans source files for custom macros and expands them.
+//  Rationale:
+//  • SwiftSyntax and SwiftSyntaxBuilder ensure AST validity.
+//  • Centralized helpers promote reuse across code generation.
+//
+//  Dependencies: SwiftSyntax, SwiftSyntaxBuilder
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import SwiftSyntax
-import SwiftSyntaxParser
+import SwiftSyntaxBuilder
 
-/// Tooling wrapper for SwiftSyntax macro expansion.
-public struct SwiftSyntaxTool {
-    /// Process all `.swift` files in the directory, expanding macros.
-    public func processMacros(in sourceDir: URL) throws {
-        let fm = FileManager.default
-        let files = try fm.contentsOfDirectory(at: sourceDir, includingPropertiesForKeys: nil)
-        for file in files where file.pathExtension == "swift" {
-            let tree = try SyntaxParser.parse(file)
-            // TODO: Walk tree, find macro invocations, expand via MacroKit
-            // and overwrite file with generated code.
-        }
+public enum SwiftSyntaxHelper {
+    /// Builds a barebones public struct with default initializer.
+    public static func makeEmptyStruct(named name: String) -> StructDeclSyntax {
+        return StructDeclSyntax(
+            """
+            public struct \(raw: name) {
+                /// Default initializer.
+                public init() {}
+            }
+            """
+        )
     }
 }

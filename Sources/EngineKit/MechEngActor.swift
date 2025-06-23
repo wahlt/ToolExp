@@ -1,39 +1,36 @@
 //
 //  MechEngActor.swift
-//  ToolExp
+//  EngineKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Mechanical actor that runs physics via FysEngActor.
+//  • Interfaces with RepStruct to update node positions.
 //
-
+//  Discussion:
+//  MechEngActor receives “apply” intents, loads graph data,
+//  runs simulation, then writes back updated positions.
 //
-// MechEngActor.swift
-// EngineKit — Mechanical animation & execution actor.
+//  Rationale:
+//  • Separates raw physics from Rep-level orchestration.
+//  • Leverages actor isolation for thread safety.
 //
-// Responsibilities:
-//
-//  1. Rigid‐body simulation (springs, constraints).
-//  2. 6DoF state propagation (positions, orientations).
-//  3. GPU‐accelerated force solves via MLXRenderer or Fallback.
+//  Dependencies: RepKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import RepKit
 
-public final class MechEngActor {
-    public init() {}
+public actor MechEngActor {
+    public static let shared = MechEngActor()
+    private init() {}
 
-    /// Step the mechanical simulation by `dt`.
-    ///
-    /// - Parameters:
-    ///   - rep: current `RepStruct` with transform traits.
-//    - dt: time delta.
-    /// - Returns: updated `RepStruct` with new cell transforms.
-    public func step(rep: RepStruct, dt: TimeInterval) -> RepStruct {
-        // TODO:
-        // 1. Extract 6DoF states from `cell.data`.
-        // 2. Compute forces (springs, gravity, collisions).
-        // 3. Integrate velocities & positions.
-        // 4. Return new RepStruct with updated state.
-        return rep
+    /// Applies physics step for the given Rep ID.
+    public func apply(_ payload: Any?) async throws {
+        guard let repID = payload as? UUID else { return }
+        var (nodes, edges) = try await RepStruct.shared.loadGraph(for: repID)
+        await FysEngActor.shared.simulate(nodes: &nodes, edges: edges, delta: 1/60)
+        try await RepStruct.shared.updatePositions(repID: repID, nodes: nodes)
     }
 }

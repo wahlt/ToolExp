@@ -1,34 +1,36 @@
 //
 //  PrefetchServ.swift
-//  ToolExp
+//  ServiceKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Prefetches remote or local resources to warm caches.
+//  • Reduces latency when entering new Bands or Takes.
 //
-
+//  Discussion:
+//  Preloading resources (images, model data) speeds perceived responsiveness.
 //
-// PrefetchServ.swift
-// ServiceKit — Preloads assets, Reps, or compute pipelines to minimize UI jank.
+//  Rationale:
+//  • Simple background downloads on utility queue.
+//  • Fire-and-forget model since failures are non-critical.
+//
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import Combine
-import RepKit
 
-/// Simple cache for prefetching Reps in the background.
-public actor PrefetchServ {
-    private var cache: [UUID: RepStruct] = [:]
+public class PrefetchServ {
+    public static let shared = PrefetchServ()
+    private init() {}
 
-    /// Prefetch a Rep by ID via DataServ.
-    public func prefetch(repID: UUID) async {
-        if cache[repID] == nil {
-            if let rep = try? await DataServ().load(id: repID) {
-                cache[repID] = rep
+    /// Fetches given URLs in parallel.
+    public func prefetch(urls: [URL]) {
+        let queue = DispatchQueue.global(qos: .utility)
+        urls.forEach { url in
+            queue.async {
+                _ = try? Data(contentsOf: url)
             }
         }
-    }
-
-    /// Retrieve a prefetched Rep if available.
-    public func cached(repID: UUID) -> RepStruct? {
-        return cache[repID]
     }
 }

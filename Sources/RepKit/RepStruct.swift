@@ -1,63 +1,71 @@
 //
 //  RepStruct.swift
-//  ToolExp
+//  RepKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • In‐memory store of multiple Rep graphs.
+//  • Conforms to RepProtocol for graph load/update operations.
 //
-
+//  Discussion:
+//  Simplest Rep storage: actor‐isolated dictionary of repID→RepStruct.
 //
-// RepStruct.swift
-// RepKit — Concrete, Codable container for a Rep graph.
+//  Rationale:
+//  • Actor ensures thread safety.
+//  • In‐memory store can be replaced with DataServ persistence later.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// A concrete implementation of `RepProtocol`.
-public struct RepStruct: RepProtocol {
-    public let id: RepID
-    public var name: String
-    public var cells: [RepID: Cell]
+public struct RepStruct: Codable {
+    public let id: UUID
+    public var cells: [Cell]
+}
 
-    /// Create an empty Rep with just a name.
-    public init(id: RepID = .init(), name: String, cells: [RepID: Cell] = [:]) {
-        self.id = id
-        self.name = name
-        self.cells = cells
+public actor RepStructStore: RepProtocol {
+    public static let shared = RepStructStore()
+    private var store: [UUID: RepStruct] = [:]
+
+    public func loadGraph(for repID: UUID) async throws -> ([Cell], [(Int, Int)]) {
+        guard let rep = store[repID] else {
+            throw NSError(domain: "RepStruct", code: 404, userInfo: [NSLocalizedDescriptionKey: "Rep not found"])
+        }
+        let cells = rep.cells
+        var edges: [(Int, Int)] = []
+        let idIndex = Dictionary(uniqueKeysWithValues: cells.enumerated().map { ($1.id, $0) })
+        for (i, cell) in cells.enumerated() {
+            for (_, targetID) in cell.ports {
+                if let j = idIndex[targetID] {
+                    edges.append((i, j))
+                }
+            }
+        }
+        return (cells, edges)
     }
 
-    /// Add a cell, returning a new Rep with the cell inserted.
-    public func adding(_ cell: Cell) -> RepStruct {
-        var copy = self
-        copy.cells[cell.id] = cell
-        return copy
+    public func updateCells(repID: UUID, cells: [Cell]) async throws {
+        guard store[repID] != nil else {
+            throw NSError(domain: "RepStruct", code: 404, userInfo: [NSLocalizedDescriptionKey: "Rep not found"])
+        }
+        store[repID]?.cells = cells
     }
 
-    /// Remove a cell and all ports pointing to it.
-    public func removing(cellID: RepID) throws -> RepStruct {
-        guard cells[cellID] != nil else {
-            throw RepError.cellNotFound(cellID)
+    public func applyUpdates(repID: UUID, updates: [RepUpdate]) async throws {
+        guard var rep = store[repID] else {
+            throw NSError(domain: "RepStruct", code: 404, userInfo: [NSLocalizedDescriptionKey: "Rep not found"])
         }
-        var copy = self
-        copy.cells[cellID] = nil
-        // Remove incoming ports
-        for (id, var c) in copy.cells {
-            c.ports = c.ports.filter { $0.value != cellID }
-            copy.cells[id] = c
+        for update in updates {
+            rep = update.applying(to: rep)
         }
-        return copy
+        store[repID] = rep
     }
 
-    /// Apply a single `RepUpdate` and return the new Rep.
-    public func applying(_ update: RepUpdate) throws -> RepStruct {
-        switch update {
-        case .renameCell(let id, let newLabel):
-            return try renaming(cell: id, to: newLabel)
-        case .updateData(let id, let newData):
-            return try updatingData(of: id, to: newData)
-        case .connect(let id, let port, let to):
-            return try connecting(cell: id, port: port, to: to)
-        case .disconnect(let id, let port):
-            return try disconnecting(cell: id, port: port)
-        }
+    /// Creates a new empty Rep and returns its ID.
+    public func createEmpty() -> UUID {
+        let rep = RepStruct(id: UUID(), cells: [])
+        store[rep.id] = rep
+        return rep.id
     }
 }

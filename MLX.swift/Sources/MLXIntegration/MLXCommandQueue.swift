@@ -6,23 +6,38 @@
 //
 
 // MLXCommandQueue.swift
+// MLXIntegration — Manages command buffers and ML “encoders” via MTLComputeCommandEncoder.
+
 import Metal
 
-/// Manages creation of ML-specific encoders.
 public final class MLXCommandQueue {
-  let device: MTLDevice
-  public init(device: MTLDevice) {
-    self.device = device
-  }
+    public let device: MTLDevice
+    private let queue: MTLCommandQueue
 
-  public func makeCommandBuffer(queue: MTLCommandQueue) -> MTLCommandBuffer? {
-    queue.makeCommandBuffer()
-  }
+    public init(device: MTLDevice) {
+        guard let q = device.makeCommandQueue() else {
+            fatalError("MLXCommandQueue: cannot create MTLCommandQueue")
+        }
+        self.device = device
+        self.queue = q
+    }
 
-  public func makeMLCommandEncoder(
-    commandBuffer: MTLCommandBuffer
-  ) -> MTLCommandEncoder? {
-    // stub: in Metal 4 you'd call makeMachineLearningCommandEncoder()
-    commandBuffer.makeComputeCommandEncoder()
-  }
+    /// Create a new command buffer, optionally labeled.
+    public func makeCommandBuffer(label: String? = nil) -> MTLCommandBuffer {
+        let cmd = queue.makeCommandBuffer()!
+        if let label = label { cmd.label = label }
+        return cmd
+    }
+
+    /// Create a compute‐encoder to stand in for the ML encoder.
+    public func makeMLCommandEncoder(
+        commandBuffer: MTLCommandBuffer,
+        label: String? = nil
+    ) -> MTLComputeCommandEncoder {
+        guard let enc = commandBuffer.makeComputeCommandEncoder() else {
+            fatalError("MLXCommandQueue: cannot create MTLComputeCommandEncoder")
+        }
+        if let label = label { enc.label = label }
+        return enc
+    }
 }

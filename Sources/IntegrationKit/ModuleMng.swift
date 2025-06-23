@@ -1,50 +1,46 @@
 //
 //  ModuleMng.swift
-//  ToolExp
+//  IntegrationKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Manages dynamic loading/unloading of Kit modules at runtime.
+//  • Supports registering ModuleDescriptor and lookup.
 //
-
+//  Discussion:
+//  In a plugin architecture, modules can arrive via hot-reload.
+//  ModuleMng keeps a registry and handles lifecycle events.
 //
-// ModuleMng.swift
-// IntegrationKit — Core manager for dynamic plugin modules.
+//  Rationale:
+//  • Single point to discover available “Kits.”
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Describes a dynamically loaded module plugin.
-public struct ModuleDescriptor: Identifiable, Codable {
-    public let id: UUID
+public struct ModuleDescriptor {
     public let name: String
-    public let path: URL
+    public let version: String
 }
 
-/// Actor responsible for loading/unloading modules.
-public actor ModuleMng {
-    private var modules: [UUID: ModuleDescriptor] = [:]
+public class ModuleMng {
+    public static let shared = ModuleMng()
+    private init() {}
+    private var modules: [String: ModuleDescriptor] = [:]
 
-    public init() {}
-
-    /// Load a module bundle at the given URL.
-    public func loadModule(at url: URL) throws {
-        // TODO: Validate .bundle, ensure code-signed if required
-        let descriptor = ModuleDescriptor(
-            id: UUID(),
-            name: url.deletingPathExtension().lastPathComponent,
-            path: url
-        )
-        modules[descriptor.id] = descriptor
-        // TODO: Dynamically load with `Bundle(path:)`
+    /// Registers a module descriptor.
+    public func register(_ desc: ModuleDescriptor) {
+        modules[desc.name] = desc
     }
 
-    /// Unload a previously loaded module.
-    public func unloadModule(id: UUID) {
-        modules.removeValue(forKey: id)
-        // TODO: Perform any clean-up required by the plugin
-    }
-
-    /// List all currently loaded modules.
-    public func listModules() -> [ModuleDescriptor] {
+    /// Returns all registered modules.
+    public func allModules() -> [ModuleDescriptor] {
         return Array(modules.values)
+    }
+
+    /// Lookup a module by name.
+    public func descriptor(named name: String) -> ModuleDescriptor? {
+        return modules[name]
     }
 }

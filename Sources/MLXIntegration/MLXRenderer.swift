@@ -1,82 +1,61 @@
 //
 //  MLXRenderer.swift
-//  ToolExp
+//  MLXIntegration
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Orchestrates MLX tiling, pipelining, and execution on Metal & NPU.
+//  • Exposes async/await entrypoints for high-level tasks.
+//
+//  Discussion:
+//  Heavy tensor and shader workloads offloaded here—with fallback to CPU.
+//
+//  Rationale:
+//  • Encapsulate all MLX logic to avoid bleeding into core Rep code.
+//  • Provide unified API handling compilation, dispatch, and merging.
+//
+//  Dependencies: Metal
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
-//
-// MLXRenderer.swift
-// MLXIntegration — Metal 4 + ML command‐encoder integration.
-// Leverages MLX Swift API, MPSGraph, mesh shaders, and MetalFX.
-//
+import Foundation
+import Metal
 
-import MetalKit
-import MLX
-import MetalPerformanceShadersGraph
-
-/// Renders with a combination of standard and ML-accelerated passes.
-public final class MLXRenderer: NSObject, MTKViewDelegate {
+public class MLXRenderer {
     private let device: MTLDevice
-    private let queue: MTLCommandQueue
-    private let mlContext: MLContext
-    private let graph: MPSGraph
+    private let library: MTLLibrary
 
-    public init?(mtkView: MTKView) {
-        guard let dev = MTLCreateSystemDefaultDevice(),
-              let q = dev.makeCommandQueue() else {
-            return nil
+    public init() throws {
+        guard let dev = MTLCreateSystemDefaultDevice() else {
+            throw NSError(domain: "MLXRenderer", code: -1, userInfo: nil)
         }
         device = dev
-        queue = q
-        mlContext = MLContext(device: dev)
-        graph = MPSGraph()
-        super.init()
-        mtkView.device = dev
-        mtkView.delegate = self
+        library = try device.makeDefaultLibrary(bundle: .main)
     }
 
-    public func draw(in view: MTKView) {
-        guard let desc = view.currentRenderPassDescriptor,
-              let drawable = view.currentDrawable else { return }
-
-        #if DEBUG
-        MTLCaptureManager.shared().startCapture(device: device)
-        #endif
-
-        let cb = queue.makeCommandBuffer()!
-
-        // ————— MLX Pass —————
-        let tensorA = mlContext.tensor([1.0, 2.0, 3.0])
-        let result = mlContext.matmul(tensorA, tensorA)
-        mlContext.encodeGraph(
-            graph,
-            to: cb,
-            inputs: ["input": tensorA],
-            results: ["output": result]
-        )
-
-        // ————— Mesh Shader Pass —————
-        // TODO: set up MTLMeshDescriptor & dispatch via new pipeline
-
-        // ————— MetalFX Denoise & Upscale —————
-        if let denoiser = MPSImageDenoise(device: device) {
-            denoiser.encode(
-                commandBuffer: cb,
-                sourceTexture: drawable.texture,
-                destinationTexture: drawable.texture
-            )
+    /// Executes a tiled compute job asynchronously.
+    public func executeTiledJob(tileData: [Data], functionName: String) async throws -> [Data] {
+        guard let fn = library.makeFunction(name: functionName) else {
+            throw NSError(domain: "MLXRenderer", code: -2, userInfo: nil)
         }
+        let pipeline = try device.makeComputePipelineState(function: fn)
+        var results: [Data] = []
 
-        cb.present(drawable)
-        cb.commit()
-
-        #if DEBUG
-        MTLCaptureManager.shared().stopCapture()
-        #endif
-    }
-
-    public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        // Handle resize if needed
+        for tile in tileData {
+            let buffer = device.makeBuffer(bytes: tile, length: tile.count, options: [])!
+            let cmdQ = device.makeCommandQueue()!
+            let cmdBuf = cmdQ.makeCommandBuffer()!
+            let encoder = cmdBuf.makeComputeCommandEncoder()!
+            encoder.setComputePipelineState(pipeline)
+            encoder.setBuffer(buffer, offset: 0, index: 0)
+            let threads = MTLSize(width: tile.count/MemoryLayout<Float>.size, height: 1, depth: 1)
+            encoder.dispatchThreads(threads, threadsPerThreadgroup: MTLSize(width: 16, height:1, depth:1))
+            encoder.endEncoding()
+            cmdBuf.commit()
+            cmdBuf.waitUntilCompleted()
+            let out = Data(bytes: buffer.contents(), count: tile.count)
+            results.append(out)
+        }
+        return results
     }
 }

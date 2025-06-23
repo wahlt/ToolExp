@@ -1,50 +1,40 @@
 //
 //  Productivity.swift
-//  ToolExp
+//  ProjectKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Manages project productivity metrics: time spent, milestones.
+//  • Interfaces with ChronosKit for timing.
 //
-
+//  Discussion:
+//  Tracking durations on tasks and milestones gives insight into workflows.
 //
-// Productivity.swift
-// ProjectKit — Productivity lens (time tracking, KPIs).
+//  Rationale:
+//  • Keep timer logic in one place, separate from UI.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Holds productivity metrics for a project.
-public struct ProductivityMetrics {
-    public var hoursLogged: TimeInterval
-    public var tasksCompleted: Int
-
-    public init(hoursLogged: TimeInterval = 0, tasksCompleted: Int = 0) {
-        self.hoursLogged = hoursLogged
-        self.tasksCompleted = tasksCompleted
-    }
+public struct Milestone {
+    public let id: String
+    public let title: String
+    public let dueDate: Date
 }
 
-/// Actor to manage per-project productivity data.
-public actor Productivity {
-    private var metrics: [UUID: ProductivityMetrics] = [:]
+public class Productivity {
+    private var milestoneTimers: [String: Date] = [:]
 
-    public init() {}
-
-    /// Log time spent on a project.
-    public func logTime(projectID: UUID, hours: TimeInterval) {
-        var m = metrics[projectID] ?? ProductivityMetrics()
-        m.hoursLogged += hours
-        metrics[projectID] = m
+    /// Starts timing a milestone.
+    public func start(_ m: Milestone) {
+        milestoneTimers[m.id] = Date()
     }
 
-    /// Mark a task completed for a project.
-    public func completeTask(projectID: UUID) {
-        var m = metrics[projectID] ?? ProductivityMetrics()
-        m.tasksCompleted += 1
-        metrics[projectID] = m
-    }
-
-    /// Retrieve metrics for a project.
-    public func getMetrics(for projectID: UUID) -> ProductivityMetrics {
-        return metrics[projectID] ?? ProductivityMetrics()
+    /// Stops timing and returns seconds spent.
+    public func stop(_ m: Milestone) -> TimeInterval? {
+        guard let start = milestoneTimers.removeValue(forKey: m.id) else { return nil }
+        return Date().timeIntervalSince(start)
     }
 }

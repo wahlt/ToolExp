@@ -1,39 +1,40 @@
 //
 //  BridgeKit.swift
-//  ToolExp
+//  BridgeKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Utility layer for interacting with UIKit and other Apple APIs.
+//  • Centralizes cross-cutting “bridge” functions (presenting, handoff).
+//
+//  Discussion:
+//  Rather than sprinkling `UIApplication.shared` everywhere, BridgeKit
+//  contains common patterns like modal presentation or Continuity handoff.
+//
+//  Rationale:
+//  • Reduces duplicated boilerplate across ViewControllers.
+//  • Eases future refactors if Apple’s API changes.
+//
+//  Dependencies: UIKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
-//
-// BridgeKit.swift
-// BridgeKit — Root namespace for all external adapters.
-//
-// Centralizes logging, authentication, and registration of adaptors.
-//
+import UIKit
 
-import Foundation
-
-/// Protocol that every external system adaptor must conform to.
-public protocol SystemAdaptor {
-    /// A unique name, e.g. "OpenAI", "Wolfram", "WeatherKit".
-    static var name: String { get }
-    /// Perform any one-time setup (e.g. API keys).
-    static func configure()
-}
-
-/// Manager that holds registered adaptors.
-public struct BridgeKit {
-    private static var adaptors: [SystemAdaptor.Type] = []
-
-    /// Register an adaptor for later use.
-    public static func register(_ adaptor: SystemAdaptor.Type) {
-        adaptors.append(adaptor)
-        adaptor.configure()
-    }
-
-    /// List all registered adaptor names.
-    public static func registeredNames() -> [String] {
-        return adaptors.map { $0.name }
+public enum BridgeKit {
+    /// Presents a view controller modally from the key window’s root.
+    ///
+    /// If no key window is found, fails silently.
+    public static func present(_ vc: UIViewController, animated: Bool = true) {
+        let scenes = UIApplication.shared.connectedScenes
+        let keyWindow = scenes
+            .compactMap { ($0 as? UIWindowScene)?.windows.first { $0.isKeyWindow } }
+            .first
+        guard let root = keyWindow?.rootViewController else { return }
+        if let presented = root.presentedViewController {
+            presented.present(vc, animated: animated, completion: nil)
+        } else {
+            root.present(vc, animated: animated, completion: nil)
+        }
     }
 }

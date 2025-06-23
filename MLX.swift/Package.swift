@@ -5,9 +5,23 @@
 //  Created by Thomas Wahl on 6/17/25.
 //
 
-Tom@Michelles-MacBook-Air ToolExp % git clone https://github.com/wahlt/MLX.swift.git /tmp/MLX-test
-Cloning into '/tmp/MLX-test'...
-Username for 'https://github.com': wahlt
-Password for 'https://wahlt@github.com':
-remote: Repository not found.
-fatal: repository 'https://github.com/wahlt/MLX.swift.git/' not found
+// ToolExp/MLX.swift/Package.swift
+// swift-tools-version:6.2
+import PackageDescription
+
+let package = Package(
+    name: "MLX.swift",
+    platforms: [
+        .iOS(.v17), .macOS(.v15)
+    ],
+    products: [
+        .library(name: "MLXIntegration", targets: ["MLXIntegration"])
+    ],
+    targets: [
+        .target(
+            name: "MLXIntegration",
+            dependencies: [],
+            path: "Sources/MLXIntegration"
+        )
+    ]
+)

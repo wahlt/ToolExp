@@ -1,47 +1,49 @@
 //
 //  RendEng.swift
-//  ToolExp
+//  RenderKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Core renderer using Metal command buffers & encoders.
+//  • Supports multiple mesh types, textures, and post-effects.
 //
-
+//  Discussion:
+//  Replaces DynamicFallbackRenderer when full feature set available.
 //
-// RendEng.swift
-// RenderKit — Basic GPU renderer stub (Metal2 fallback).
-//
-// Responsibilities:
-//  • Provide minimal unlit mesh+color rendering.
-//  • Serve as a reference for more advanced pipelines.
+//  Rationale:
+//  • Central place for draw-call management and GPU state setup.
+//  Dependencies: MetalKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import MetalKit
-import RepKit
 
-public final class RendEng: Renderer {
+public class RendEng {
     private let device: MTLDevice
-    private let queue: MTLCommandQueue
-    private let pipelineState: MTLRenderPipelineState
+    private let commandQueue: MTLCommandQueue
 
-    public init(view: MTKView) {
-        self.device = view.device!
-        self.queue = device.makeCommandQueue()!
-        // TODO: compile a basic vertex+fragment shader into `pipelineState`
-        self.pipelineState = try! device.makeRenderPipelineState(
-            descriptor: MTLRenderPipelineDescriptor()
-        )
+    public init(device: MTLDevice) {
+        self.device = device
+        self.commandQueue = device.makeCommandQueue()!
     }
 
-    public func render(_ rep: RepStruct, in view: MTKView) {
-        guard let cmdBuf = queue.makeCommandBuffer(),
-              let rpd   = view.currentRenderPassDescriptor,
-              let enc   = cmdBuf.makeRenderCommandEncoder(descriptor: rpd)
-        else { return }
-
-        enc.setRenderPipelineState(pipelineState)
-        // TODO: set vertex/index buffers and draw each cell’s mesh
+    /// Renders an array of meshes into the given MTKView.
+    public func render(meshes: [RenderableMesh], in view: MTKView) {
+        guard let drawable = view.currentDrawable,
+              let desc     = view.currentRenderPassDescriptor else { return }
+        let buf = commandQueue.makeCommandBuffer()!
+        let enc = buf.makeRenderCommandEncoder(descriptor: desc)!
+        for mesh in meshes {
+            // Bind mesh.pipelineState, vertexBuffers, textures…
+            enc.setRenderPipelineState(mesh.pipelineState)
+            enc.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
+            enc.drawPrimitives(type: .triangle,
+                               vertexStart: 0,
+                               vertexCount: mesh.vertexCount)
+        }
         enc.endEncoding()
-        cmdBuf.present(view.currentDrawable!)
-        cmdBuf.commit()
+        buf.present(drawable)
+        buf.commit()
     }
 }

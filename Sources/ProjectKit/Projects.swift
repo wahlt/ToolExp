@@ -1,50 +1,40 @@
-// Projects.swift
-// CRUD for ProjectEntity using SwiftData (iOS/macOS 26+)
+//
+//  Projects.swift
+//  ProjectKit
+//
+//  Specification:
+//  • Model for Tool projects: metadata, file paths, last modified.
+//  • CRUD via DataServ for persistence.
+//
+//  Discussion:
+//  Projects encapsulate workspaces; modeling helps list and switch them.
+//
+//  Rationale:
+//  • Use Persistable to leverage JSON storage.
+//  Dependencies: Foundation, DataServ
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
+//
 
 import Foundation
-import SwiftData
+import DataServ
 
-@Model
-public class ProjectEntity: Observable {
-    @Attribute(.unique) public var id: UUID
+public struct Project: Persistable {
+    public static let storageKey = "projects"
+    public var id: UUID
     public var name: String
+    public var path: String
     public var lastModified: Date
-
-    public init(
-        id: UUID = .init(),
-        name: String,
-        lastModified: Date = .init()
-    ) {
-        self.id = id
-        self.name = name
-        self.lastModified = lastModified
-    }
 }
 
-/// Manages your Projects database.
-public actor Projects {
-    public let context: ModelContext
-
-    public init(
-        context: ModelContext = {
-            let container = try! ModelContainer(for: [ProjectEntity.self])
-            return ModelContext(container: container)
-        }()
-    ) {
-        self.context = context
+public enum ProjectManager {
+    /// Fetches all saved projects.
+    public static func all() throws -> [Project] {
+        return try DataServ.shared.loadAll(Project.self)
     }
 
-    public func fetchAll() async throws -> [ProjectEntity] {
-        try await context.fetch(FetchDescriptor<ProjectEntity>())
-    }
-
-    public func save(_ project: ProjectEntity) async throws {
-        context.insert(project)
-        try context.save()
-    }
-
-    public func delete(_ project: ProjectEntity) async throws {
-        context.delete(project)
-        try context.save()
+    /// Saves or updates a project list.
+    public static func save(_ list: [Project]) throws {
+        try DataServ.shared.saveAll(list, as: Project.self)
     }
 }

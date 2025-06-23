@@ -1,62 +1,36 @@
 //
 //  Governance.swift
-//  ToolExp
+//  ProjectKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Defines project governance policies: access roles, permissions.
+//  • Provides evaluation of policy compliance.
 //
-
+//  Discussion:
+//  Projects may have multiple collaborators with varied roles.
+//  Governance ensures only authorized edits or launches.
 //
-// Governance.swift
-// ProjectKit — Governance rules engine for project policies.
+//  Rationale:
+//  • Centralize policy logic rather than scattering across UI.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Represents a project in your workspace.
-public struct Project {
-    public let id: UUID
-    public let name: String
-    // TODO: add other project metadata (owner, created date, etc.)
+public enum ProjectRole: String, Codable {
+    case owner, editor, viewer
 }
 
-/// A governance rule that can validate a Project.
-public struct GovernanceRule {
-    public let id: UUID
-    public let name: String
-    public let description: String
-    public let validate: (Project) -> Bool
-
-    public init(
-        id: UUID = .init(),
-        name: String,
-        description: String,
-        validate: @escaping (Project) -> Bool
-    ) {
-        self.id = id
-        self.name = name
-        self.description = description
-        self.validate = validate
-    }
-}
-
-/// Actor to manage and evaluate governance rules.
-public actor Governance {
-    private var rules: [UUID: GovernanceRule] = [:]
-
-    public init() {}
-
-    /// Add a new rule.
-    public func addRule(_ rule: GovernanceRule) {
-        rules[rule.id] = rule
-    }
-
-    /// Remove a rule by its ID.
-    public func removeRule(id: UUID) {
-        rules.removeValue(forKey: id)
-    }
-
-    /// Evaluate all rules against a project, returning violations.
-    public func evaluate(project: Project) -> [GovernanceRule] {
-        return rules.values.filter { !($0.validate(project)) }
+public struct Governance {
+    /// Checks if a user with a given role can perform an action.
+    public static func canPerform(role: ProjectRole, action: String) -> Bool {
+        switch (role, action) {
+        case (.owner, _):                return true
+        case (.editor, "edit"), (.editor, "view"):  return true
+        case (.viewer, "view"):          return true
+        default:                         return false
+        }
     }
 }

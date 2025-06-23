@@ -1,68 +1,35 @@
 //
 //  Decompose.swift
-//  ToolExp
+//  DataServ
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Reflectively converts any instance into a dictionary via Mirror.
+//  • Omits private or unsupported types.
 //
-
+//  Discussion:
+//  For UI debugging and dynamic form editors, a generic
+//  object-to-dictionary converter speeds prototyping.
 //
-// Decompose.swift
-// DataServ — Scene inventory & stroke lineage decomposition.
+//  Rationale:
+//  • Mirror API is built-in and supports both Codable and non-Codable types.
+//  • Clients can filter or transform values post hoc.
 //
-// Provides a way to split a large Rep graph into its connected
-// subgraphs, so each can be edited, rendered, or processed in isolation.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
 
-public extension RepStruct {
-    /// Extract all connected subgraphs as independent `RepStruct`s.
-    ///
-    /// - Returns: An array of `RepStruct`, one per connected component
-    ///   in the original graph.  Each new Rep has a fresh `id` and
-    ///   name "\(originalName)-subN", preserving only the cells and
-    ///   ports within that component.
-    func decomposeSubgraphs() -> [RepStruct] {
-        var result: [RepStruct] = []
-        var visited: Set<RepID> = []
-
-        // Iterate every cell; if unvisited, BFS its component
-        for startID in cells.keys where !visited.contains(startID) {
-            // 1) Perform BFS to collect all cell IDs in this component
-            var componentIDs: [RepID] = []
-            var queue: [RepID] = [startID]
-            visited.insert(startID)
-
-            while let id = queue.first {
-                queue.removeFirst()
-                componentIDs.append(id)
-
-                // Enqueue neighbors via all outgoing ports
-                for (_, neighbor) in cells[id]?.ports ?? [:] {
-                    if !visited.contains(neighbor) {
-                        visited.insert(neighbor)
-                        queue.append(neighbor)
-                    }
-                }
-            }
-
-            // 2) Build a new RepStruct containing only those cells/ports
-            let newRepID = RepID()
-            var subRep = RepStruct(id: newRepID, name: "\(name)-sub\(result.count)")
-
-            // Copy each cell and its intra-component ports
-            for id in componentIDs {
-                if var cell = cells[id] {
-                    // Filter ports to only those targeting within this component
-                    cell.ports = cell.ports.filter { componentIDs.contains($0.value) }
-                    subRep = subRep.adding(cell)
-                }
-            }
-
-            result.append(subRep)
+public enum Decompose {
+    /// Uses Mirror to extract child labels and values.
+    public static func entityToDict(_ value: Any) -> [String: Any] {
+        var dict: [String: Any] = [:]
+        let mirror = Mirror(reflecting: value)
+        for child in mirror.children {
+            guard let key = child.label else { continue }
+            dict[key] = child.value
         }
-
-        return result
+        return dict
     }
 }

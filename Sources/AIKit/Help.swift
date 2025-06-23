@@ -1,55 +1,46 @@
 //
 //  Help.swift
-//  ToolExp
+//  AIKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Loads and serves Markdown-based help topics.
+//  • Provides lookup by topic ID.
 //
-
+//  Discussion:
+//  In-app help must be fast and offline, so pre-bundle JSON/Markdown.
+//  Topics are keyed by ID to decouple storage from UI.
 //
-// Help.swift
-// AIKit — In-app Help system, powered by AI or static topics.
+//  Rationale:
+//  • Simple dictionary lookup offers O(1) retrieval.
+//  • Bundled topics avoid runtime network dependency.
 //
-// Provides contextual help based on keywords or AI fallback.
+//  Dependencies: none (Foundation only)
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// A single help topic entry.
-public struct HelpTopic {
-    /// Short identifier, e.g. "creating_cells"
-    public let id: String
-    /// Human-readable title.
-    public let title: String
-    /// Detailed description or markdown.
-    public let content: String
-}
+public class HelpManager {
+    private var topics: [String: String] = [:]
 
-/// The help system, offering static topics and AI-backed answers.
-public actor HelpSystem {
-    private let topics: [HelpTopic]
-    private let aiService: DefaultAIService
-
-    /// Initialize with built-in topics and optional AI fallback.
-    public init(
-        topics: [HelpTopic] = [],
-        aiService: DefaultAIService = .init()
-    ) {
-        self.topics = topics
-        self.aiService = aiService
+    public init() {
+        loadBuiltInTopics()
     }
 
-    /// Fetch a static topic by ID.
-    public func topic(by id: String) -> HelpTopic? {
-        return topics.first { $0.id == id }
+    /// Returns Markdown help for a given ID, or nil.
+    public func content(for id: String) -> String? {
+        return topics[id]
     }
 
-    /// Provide help for an arbitrary query, using AI if no static topic matches.
-    public func query(_ text: String) async throws -> String {
-        if let topic = topic(by: text) {
-            return topic.content
-        }
-        // Fallback to AI
-        let prompt = "Help me with Tool-exp: \(text)"
-        return try await aiService.complete(prompt: prompt, maxTokens: 200)
+    /// Loads default topics from a bundled resource.
+    private func loadBuiltInTopics() {
+        // TODO: Replace with real JSON bundle in production.
+        topics["getting_started"] = """
+        # Getting Started
+        Welcome to Tool! \
+        Use one-finger tap to select, two-finger pinch to zoom, \
+        and three-finger drag for global transforms.
+        """
     }
 }

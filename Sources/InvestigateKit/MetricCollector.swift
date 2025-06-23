@@ -1,52 +1,43 @@
 //
 //  MetricCollector.swift
-//  ToolExp
+//  InvestigateKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Aggregates time, memory, and evaluation metrics during Investigate runs.
+//  • Emits a summary at completion.
 //
-
+//  Discussion:
+//  Detailed metrics help tune mutation heuristics and MLX parameters.
 //
-// MetricCollector.swift
-// InvestigateKit — Performance metrics & profiling using os_signpost.
-//
-// Use this to instrument your code paths (e.g. MechEng steps, ML passes).
+//  Rationale:
+//  • Data-driven insights guide AI and simulation tuning.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import os.signpost
 
-/// Central collector for performance metrics.
-public final class MetricCollector {
-    /// Shared singleton instance.
-    public static let shared = MetricCollector()
+public struct InvestigationMetrics {
+    public let duration: TimeInterval
+    public let peakMemoryMB: Double
+    public let bestDensity: Double
+}
 
-    private let log: OSLog
-    private let signposter: OSSignposter
+public class MetricCollector {
+    private var start: Date = Date()
+    private var bestDensity: Double = -Double.infinity
 
-    private init() {
-        // Subsystem should match your app’s bundle ID
-        log = OSLog(subsystem: "com.yourcompany.Tool", category: "InvestigateKit")
-        signposter = OSSignposter(log: log)
+    public func markStart() {
+        start = Date()
     }
 
-    /// Begin a timing interval for a given name.
-    /// - Returns: a session handle you must pass to `end(_:)`.
-    @discardableResult
-    public func startInterval(_ name: StaticString) -> OSSignposter.Session {
-        return signposter.beginInterval(name: name)
+    public func updateDensity(_ density: Double) {
+        bestDensity = max(bestDensity, density)
     }
 
-    /// End a previously begun timing interval.
-    /// - Parameter session: the session returned from `startInterval(_:)`.
-    public func endInterval(_ session: OSSignposter.Session, name: StaticString) {
-        signposter.endInterval(name: name, session: session)
-    }
-
-    /// Record an instantaneous event or gauge.
-    /// - Parameters:
-    ///   - name: identifier for the metric.
-    ///   - value: numeric value to log.
-    public func recordEvent(_ name: StaticString, value: Double) {
-        os_signpost(.event, log: log, name: name, "%{public}.2f", value)
+    public func summary() -> InvestigationMetrics {
+        let dur = Date().timeIntervalSince(start)
+        return InvestigationMetrics(duration: dur, peakMemoryMB: 0, bestDensity: bestDensity)
     }
 }

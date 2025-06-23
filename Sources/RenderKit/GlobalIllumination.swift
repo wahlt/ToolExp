@@ -1,44 +1,53 @@
 //
 //  GlobalIllumination.swift
-//  ToolExp
+//  RenderKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Computes indirect lighting via sparse voxel octree tracing.
+//  • Updates a GI buffer each frame for fast lookup in shaders.
 //
-
+//  Discussion:
+//  Realistic scene lighting requires bounced light; this module
+//  precomputes coarse GI using ray-marching in a voxel grid.
 //
-// GlobalIllumination.swift
-// RenderKit — Precomputes and caches irradiance via Spherical Harmonics.
+//  Rationale:
+//  • Improves visual fidelity over direct illumination only.
+//  • Runs as a background pass to avoid frame drops.
 //
-// Responsibilities:
-//  • Sample scene via `RepRenderer` probes.
-//  • Project lighting onto SH basis.
-//  • Provide low‐frequency bounce lighting at runtime.
+//  Dependencies: Metal
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import MetalKit
-import simd
+import Metal
 
-public final class GlobalIllumination {
-    /// Precompute SH coefficients for the scene at resolution.
-    public static func precomputeSH(
-        for rep: RepStruct,
-        device: MTLDevice,
-        resolution: Int
-    ) -> [SIMD4<Float>] {
-        // 1) Place probes on a grid
-        // 2) For each probe: render scene from cube faces via `RepRenderer`
-        // 3) Project each face’s pixels onto SH bands (up to L=2 or 3)
-        // 4) Return array of 4‐float coefficients [r,g,b,weight]
-        return []
+public class GlobalIllumination {
+    private let device: MTLDevice
+    private let pipeline: MTLComputePipelineState
+    private let gridBuffer: MTLBuffer
+
+    public init(device: MTLDevice, gridSize: Int) throws {
+        self.device = device
+        let lib = try device.makeDefaultLibrary(bundle: .main)
+        guard let fn = lib.makeFunction(name: "giComputeKernel") else {
+            throw NSError(domain: "GlobalIllumination", code: -1, userInfo: nil)
+        }
+        pipeline = try device.makeComputePipelineState(function: fn)
+        gridBuffer = device.makeBuffer(length: MemoryLayout<Float>.size * gridSize * gridSize * gridSize,
+                                       options: .storageModePrivate)!
     }
 
-    /// Evaluate SH lighting at a surface normal.
-    public static func evaluateSH(
-        coeffs: [SIMD4<Float>],
-        normal: SIMD3<Float>
-    ) -> SIMD3<Float> {
-        // TODO: compute Y_lm(normal) * coeffs, sum per channel
-        return SIMD3<Float>(repeating: 1.0)
+    /// Executes the GI compute pass.
+    public func compute(commandBuffer: MTLCommandBuffer, gridSize: Int) {
+        let encoder = commandBuffer.makeComputeCommandEncoder()!
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(gridBuffer, offset: 0, index: 0)
+        let threads = MTLSize(width: 8, height: 8, depth: 8)
+        let groups  = MTLSize(width: (gridSize+7)/8,
+                              height:(gridSize+7)/8,
+                              depth:(gridSize+7)/8)
+        encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
+        encoder.endEncoding()
     }
 }

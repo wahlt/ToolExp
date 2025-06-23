@@ -1,63 +1,41 @@
 //
 //  RendUltraEng.swift
-//  ToolExp
+//  RenderKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • High-quality ray-tracing and path-tracing pipeline.
+//  • Leverages Metal Performance Shaders ray-tracing APIs.
 //
-
+//  Discussion:
+//  For final renders or static snapshots, enabling realistic
+//  reflections, shadows, and global illumination in one pass.
 //
-// RendUltraEng.swift
-// RenderKit — Next-gen “Ultra” renderer using Metal 4 + MLX.
-//
-// Responsibilities:
-//  • Use mesh shaders for GPU‐accelerated indexing.
-//  • Dispatch MLX tensor passes for advanced shading.
-//  • Use indirect command buffers for multi‐draw optimization.
-//  • Integrate MetalFX denoiser after path tracing.
+//  Rationale:
+//  • Provides “ultra” visual mode without altering main render loop.
+//  Dependencies: MetalKit, MetalPerformanceShaders
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import MetalKit
-import MLXIntegration
-import MetalPerformanceShadersGraph
-import RepKit
+import MetalPerformanceShaders
 
-public final class RendUltraEng: Renderer {
-    public static let shared = RendUltraEng()
+public class RendUltraEng {
+    private let device: MTLDevice
+    private let rtPipeline: MPSRayIntersector
 
-    private var device: MTLDevice!
-    private var queue: MTLCommandQueue!
-    private var meshPipeline: MTLComputePipelineState!
-    private var mlGraph: MPSGraph!
-
-    private init() {}
-
-    public func configure(view: MTKView) {
-        device = view.device
-        queue  = device.makeCommandQueue()
-        // 1) Compile mesh‐shader kernel
-        // 2) Build MPSGraph for tensor‐based shading
-        // 3) Prepare MetalFX denoiser
+    public init(device: MTLDevice) {
+        self.device = device
+        rtPipeline = MPSRayIntersector(device: device)
     }
 
-    public func render(_ rep: RepStruct, in view: MTKView) {
-        let cmdBuf = queue.makeCommandBuffer()!
-
-        // Mesh shader dispatch:
-        // enc = cmdBuf.makeComputeCommandEncoder()
-        // enc.setPipelineState(meshPipeline)
-        // ... set buffers → enc.dispatchThreads
-        // enc.endEncoding()
-
-        // ML shading pass:
-        // let tensorResult = try? mlGraph.executeAsync(...)
-        // commit tensorResult back to texture
-
-        // MetalFX denoise/upscale:
-        // let denoiser = MPSImageDenoiser(device: device)
-        // denoiser.encode(commandBuffer: cmdBuf, sourceTexture: rawTex, destinationTexture: view.currentDrawable!.texture)
-
-        cmdBuf.present(view.currentDrawable!)
-        cmdBuf.commit()
+    /// Executes a ray-tracing pass for the given scene.
+    public func trace(scene: ArtScene,
+                      into texture: MTLTexture,
+                      commandBuffer: MTLCommandBuffer) {
+        // 1) Build acceleration structures
+        // 2) Encode ray-generation, intersection, shading kernels
+        // 3) Write into `texture`
     }
 }

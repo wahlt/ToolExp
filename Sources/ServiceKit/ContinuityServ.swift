@@ -1,125 +1,83 @@
 //
 //  ContinuityServ.swift
-//  ToolExp
+//  ServiceKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Manages cross-device state synchronization for Tool.
+//  • Uses MultipeerConnectivity to discover peers and share Rep diffs.
 //
-
+//  Discussion:
+//  SuperContinuity demands live sync across iPad, Mac, Vision devices.
+//  This service handles peer discovery, session management, and data exchange.
 //
-// ContinuityServ.swift
-// ServiceKit — Multi-device / multi-host state sync via CloudKit & MultipeerConnectivity.
+//  Rationale:
+//  • MultipeerConnectivity provides encryption and reliable transport.
+//  • Notifications on receipt trigger local state updates.
 //
-// Broadcasts/receives graph deltas and UI events to keep multiple Devices & Agents in sync.
+//  Dependencies: MultipeerConnectivity
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import CloudKit
 import MultipeerConnectivity
-import Combine
-import RepKit
 
-public actor ContinuityServ: NSObject {
-    // MARK: – Types
+public class ContinuityServ: NSObject {
+    public static let shared = ContinuityServ()
 
-    public enum Message {
-        case repDelta(Data)      // Encoded RepUpdate
-        case uiEvent(Data)       // Encoded UI action
-    }
-
-    // MARK: – Properties
-
-    private let container = CKContainer.default()
-    private let database = CKContainer.default().privateCloudDatabase
-    private let session = MCSession(peer: MCPeerID(displayName: UIDevice.current.name))
+    private let peerID      = MCPeerID(displayName: UIDevice.current.name)
+    private let session:    MCSession
     private let advertiser: MCNearbyServiceAdvertiser
-    private let browser: MCNearbyServiceBrowser
 
-    public let incoming = PassthroughSubject<Message, Never>()
-
-    // MARK: – Initialization
-
-    public override init() {
+    private override init() {
+        session    = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .required)
         advertiser = MCNearbyServiceAdvertiser(
-            peer: session.myPeerID,
+            peer: peerID,
             discoveryInfo: nil,
-            serviceType: "tool-cont"
-        )
-        browser = MCNearbyServiceBrowser(
-            peer: session.myPeerID,
-            serviceType: "tool-cont"
+            serviceType: "tool-continuity"
         )
         super.init()
-        session.delegate = self
+        session.delegate    = self
         advertiser.delegate = self
-        browser.delegate = self
         advertiser.startAdvertisingPeer()
-        browser.startBrowsingForPeers()
     }
 
-    // MARK: – Public API
-
-    /// Broadcast a RepUpdate delta to all peers & CloudKit.
-    public func broadcast(repDelta: RepUpdate) async throws {
-        let data = try JSONEncoder().encode(repDelta)
-        // 1. Send via Multipeer
-        try session.send(data, toPeers: session.connectedPeers, with: .reliable)
-        // 2. Save to CloudKit
-        let record = CKRecord(recordType: "RepDelta")
-        record["delta"] = data as NSData
-        try await database.save(record)
+    /// Sends a Rep-diff payload to all connected peers.
+    public func sendRepDiff(_ data: Data) {
+        guard !session.connectedPeers.isEmpty else { return }
+        try? session.send(data, toPeers: session.connectedPeers, with: .reliable)
     }
 }
 
-// MARK: – MCSessionDelegate
-
-extension ContinuityServ: MCSessionDelegate {
-    public func session(_ session: MCSession,
-                        peer peerID: MCPeerID,
-                        didChange state: MCSessionState) {}
-
+extension ContinuityServ: MCSessionDelegate, MCNearbyServiceAdvertiserDelegate {
+    public func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {}
     public func session(_ session: MCSession,
                         didReceive data: Data,
-                        fromPeer peerID: MCPeerID) {
-        // Attempt decode as RepUpdate or UIEvent
-        if let delta = try? JSONDecoder().decode(RepUpdate.self, from: data) {
-            incoming.send(.repDelta(data))
-        } else {
-            incoming.send(.uiEvent(data))
-        }
+                        fromPeer peerID: MCPeerID)
+    {
+        // Handle incoming Rep diffs...
     }
-
-    // Unused delegate stubs:
-    public func session(_ session: MCSession,
-                        didReceive stream: InputStream,
-                        withName streamName: String,
-                        fromPeer peerID: MCPeerID) {}
-    public func session(_ session: MCSession,
-                        didStartReceivingResourceWithName resourceName: String,
-                        fromPeer peerID: MCPeerID,
-                        with progress: Progress) {}
-    public func session(_ session: MCSession,
-                        didFinishReceivingResourceWithName resourceName: String,
-                        fromPeer peerID: MCPeerID,
-                        at localURL: URL?,
-                        withError error: Error?) {}
-}
-
-// MARK: – MCNearbyServiceAdvertiserDelegate & BrowserDelegate
-
-extension ContinuityServ: MCNearbyServiceAdvertiserDelegate, MCNearbyServiceBrowserDelegate {
-    public func advertiser(_ advertiser: MCNearbyServiceAdvertiser,
-                           didReceiveInvitationFromPeer peerID: MCPeerID,
-                           withContext context: Data?,
-                           invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+    public func session(_: MCSession,
+                        didReceive _: InputStream,
+                        withName _: String,
+                        fromPeer _: MCPeerID) {}
+    public func session(_: MCSession,
+                        didStartReceivingResourceWithName _: String,
+                        fromPeer _: MCPeerID,
+                        with _: Progress) {}
+    public func session(_: MCSession,
+                        didFinishReceivingResourceWithName _: String,
+                        fromPeer _: MCPeerID,
+                        at _: URL?,
+                        withError _: Error?) {}
+    public func advertiser(_: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
+        print("ContinuityServ advertise error:", error)
+    }
+    public func advertiser(_: MCNearbyServiceAdvertiser,
+                           didReceiveInvitationFromPeer _: MCPeerID,
+                           withContext _: Data?,
+                           invitationHandler: @escaping (Bool, MCSession?) -> Void)
+    {
         invitationHandler(true, session)
     }
-
-    public func browser(_ browser: MCNearbyServiceBrowser,
-                        foundPeer peerID: MCPeerID,
-                        withDiscoveryInfo info: [String : String]?) {
-        browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
-    }
-
-    public func browser(_ browser: MCNearbyServiceBrowser,
-                        lostPeer peerID: MCPeerID) {}
 }

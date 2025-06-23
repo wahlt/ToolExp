@@ -1,70 +1,52 @@
 //
 //  ChronosKit.swift
-//  ToolExp
+//  EngineKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Utilities for time-based workflows: scheduling, delays, timers.
+//  • Provides human-readable formatting and time interval calculations.
 //
-
+//  Discussion:
+//  Many Kit workflows need to measure durations (gesture time windows Z),
+//  schedule retries (AI backoff), or timestamp events (analytics).
 //
-// ChronosKit.swift
-// EngineKit — Kernel compiler & simulation runner.
+//  Rationale:
+//  • Centralize all time/date logic to avoid drift and inconsistent formats.
+//  • Leverage Foundation’s Date, Calendar, DateComponents for reliability.
 //
-// Responsibilities:
-//
-//  1. Compile custom compute kernels (Metal/MLX/CPU).
-// 2. Provide unified API for stepping simulations.
-// 3. Manage resource lifetime & multi‐device dispatch.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Error thrown during kernel compilation or execution.
-public enum ChronosError: Error, LocalizedError {
-    case compilationFailed(String)
-    case executionFailed(String)
-
-    public var errorDescription: String? {
-        switch self {
-        case .compilationFailed(let msg):
-            return "Kernel compilation failed: \(msg)"
-        case .executionFailed(let msg):
-            return "Kernel execution failed: \(msg)"
-        }
-    }
-}
-
-/// Represents a compiled compute kernel.
-public protocol CompiledKernel {
-    /// Run the kernel with named input buffers & collect outputs.
-    func run(inputs: [String: Any], outputs: inout [String: Any]) throws
-}
-
-/// Main ChronosKit facade.
-public final class ChronosKit {
-    public init() {}
-
-    /// Compile source code (Metal/MLX DSL) into a `CompiledKernel`.
-    public func compileKernel(source: String) throws -> CompiledKernel {
-        // TODO:
-        // 1. Detect if source is MLX DSL or raw Metal.
-        // 2. Use MLXRenderer or MTLLibrary + function.
-        // 3. Wrap into a CompiledKernel instance.
-        throw ChronosError.compilationFailed("Not implemented")
+public enum ChronosKit {
+    /// Returns a Date after adding the specified interval to now.
+    public static func after(seconds: TimeInterval) -> Date {
+        return Date().addingTimeInterval(seconds)
     }
 
-    /// Perform a single simulation step.
-    ///
-    /// - Parameters:
-    ///   - kernel: the compiled kernel to run.
-    ///   - inputs: named input data.
-    ///   - outputs: storage for output data.
-    /// - Throws: execution errors.
-    public func step(
-        kernel: CompiledKernel,
-        inputs: [String: Any],
-        outputs: inout [String: Any]
-    ) throws {
-        // TODO: forward to kernel.run
-        try kernel.run(inputs: inputs, outputs: &outputs)
+    /// Formats a Date into a localized, human-readable string.
+    public static func formatted(_ date: Date, style: DateFormatter.Style = .short) -> String {
+        let df = DateFormatter()
+        df.dateStyle = style
+        df.timeStyle = style
+        return df.string(from: date)
+    }
+
+    /// Executes a closure after a delay on the main queue.
+    public static func delay(_ seconds: TimeInterval, execute block: @escaping ()->Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: block)
+    }
+
+    /// Measures execution time of a closure, returning the result and elapsed seconds.
+    @discardableResult
+    public static func measure<T>(_ label: String = "", _ block: () throws -> T) rethrows -> (result: T, duration: TimeInterval) {
+        let start = Date()
+        let value = try block()
+        let elapsed = Date().timeIntervalSince(start)
+        if !label.isEmpty { print("[ChronosKit] \(label) took \(elapsed)s") }
+        return (value, elapsed)
     }
 }

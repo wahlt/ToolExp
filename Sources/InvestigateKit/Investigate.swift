@@ -1,49 +1,36 @@
 //
 //  Investigate.swift
-//  ToolExp
+//  InvestigateKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Drives an investigation batch: mutates, evaluates, selects best.
 //
-
+//  Discussion:
+//  Sequence: generate variants, evaluate each, return top variant.
 //
-// Investigate.swift
-// InvestigateKit — Deep-dive investigation & profiling tools.
-//
-// Responsibilities:
-//
-//  1. Generate graph metrics and reports.
-//  2. Time-series extraction for simulation states.
-//  3. Interface with MetricKit / Instruments when available.
+//  Rationale:
+//  • Encapsulates common “what-if” loop for Tool’s exploration.
+//  Dependencies: Evaluate
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
 
-public final class Investigate {
-    public init() {}
-
-    /// Compute core graph metrics (cell count, density, max depth).
-    public func graphMetrics(for rep: RepStruct) -> [String: Any] {
-        // TODO:
-        // 1. cellCount = rep.cells.count
-        // 2. maxDepth via BFS/DFS traversal.
-        // 3. avgDegree = totalPorts / cellCount.
-        return [:]
-    }
-
-    /// Extract a time-series of a custom property over simulation steps.
-    public func timeSeries<T>(
-        property: @escaping (RepStruct) -> T,
-        initialRep: RepStruct,
-        steps: Int,
-        dt: TimeInterval
-    ) -> [T] {
-        var results: [T] = []
-        var rep = initialRep
-        for _ in 0..<steps {
-            results.append(property(rep))
-            // TODO: step physics via PhysEngAdapter or ChronosKit.
+public enum Investigate {
+    /// Returns the best-scoring variant Rep ID.
+    public static func bestVariant(for repID: UUID,
+                                   variants: [(UUID) async throws -> UUID]) async throws -> UUID {
+        var bestID = repID
+        var bestScore = -Double.infinity
+        for mutate in variants {
+            let vid = try await mutate(repID)
+            let report = try await Evaluate.report(for: vid)
+            if report.density > bestScore {
+                bestScore = report.density
+                bestID = vid
+            }
         }
-        return results
+        return bestID
     }
 }

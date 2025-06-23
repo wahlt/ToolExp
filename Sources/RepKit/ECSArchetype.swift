@@ -1,50 +1,44 @@
 //
 //  ECSArchetype.swift
-//  ToolExp
+//  RepKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Group of entities matching a set of component types.
+//  • Stores entity IDs sharing identical component signatures.
 //
-
+//  Discussion:
+//  ECS (Entity-Component-System) pattern helps structure dynamic
+//  Rep behaviors by component families.
 //
-// ECSArchetype.swift
-// RepKit — Entity‐Component‐System (ECS) archetype grouping.
-//
-// Stores cells sharing an identical set of “components” (traits)
-// to allow tight data‐parallel iteration and faster lookups.
-//
-// Usage:
-//   let arch = Archetype(signature: Set(["Physics","Renderable"]))
-//   arch.add(cell)  // only if cell’s signature matches
+//  Rationale:
+//  • Rapid filtering of entities during system updates.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Represents a contiguous group of cells that share the same component (trait) set.
-public struct Archetype {
-    /// The set of trait names defining this archetype.
-    public let signature: Set<String>
-    /// The cell IDs belonging to this archetype.
-    public private(set) var cellIDs: [RepID]
+public struct ECSArchetype {
+    public let componentKeys: Set<String>
+    private(set) public var entityIDs: Set<UUID> = []
 
-    /// Create an empty archetype with the given signature.
-    public init(signature: Set<String>, cellIDs: [RepID] = []) {
-        self.signature = signature
-        self.cellIDs = cellIDs
+    public init(components: Set<String>) {
+        self.componentKeys = components
     }
 
-    /// Add a cell (if its traits match `signature`).
-    ///
-    /// - Parameter cell: the cell to add.
-    /// - Note: A real implementation would check `cell.traits.keys == signature`.
-    public mutating func add(_ cell: Cell) {
-        // TODO: verify cell’s trait names exactly match `signature`.
-        cellIDs.append(cell.id)
+    /// Registers an entity with matching keys.
+    public mutating func add(_ id: UUID) {
+        entityIDs.insert(id)
     }
 
-    /// Remove a cell by ID.
-    ///
-    /// - Parameter cellID: the ID to remove.
-    public mutating func remove(cellID: RepID) {
-        cellIDs.removeAll { $0 == cellID }
+    /// Removes an entity.
+    public mutating func remove(_ id: UUID) {
+        entityIDs.remove(id)
+    }
+
+    /// Tests if archetype matches a given component set.
+    public func matches(components: Set<String>) -> Bool {
+        return componentKeys.isSubset(of: components)
     }
 }

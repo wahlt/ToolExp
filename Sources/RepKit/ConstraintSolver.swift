@@ -1,70 +1,61 @@
 //
 //  ConstraintSolver.swift
-//  ToolExp
+//  RepKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Solves directed‐acyclic dependency constraints via topological sort.
+//  • Throws if cycles detected.
 //
-
+//  Discussion:
+//  Some Rep uses require ordering constraints—e.g., build pipelines.
+//  ConstraintSolver turns (A→B) edges into linear execution orders.
 //
-// ConstraintSolver.swift
-// RepKit — Solves design constraints in a RepStruct.
-//
-// Constraint solving may include:
-//  • Trait consistency (e.g. sum to 1, non-negativity).
-//  • Port‐type matching (e.g. only certain port names allowed per cell type).
-//  • Global invariants (e.g. no self‐edges, degree bounds).
-//
-// This is a stubbed framework: fill in your specific constraint rules
-// and connect to a solver (iterative, MPSGraph, etc.).
+//  Rationale:
+//  • Kahn’s algorithm is efficient and well understood.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Errors that can occur during constraint solving.
-public enum ConstraintError: Error, LocalizedError {
-    /// A particular trait index on a cell failed to meet its rule.
-    case inconsistentTrait(cell: RepID, traitIndex: Int)
-
-    /// A port on a cell refers to an invalid type or is disallowed.
-    case invalidPort(cell: RepID, port: String)
-
-    public var errorDescription: String? {
-        switch self {
-        case .inconsistentTrait(let cell, let idx):
-            return "Trait #\(idx) on cell \(cell) violates its constraint."
-        case .invalidPort(let cell, let port):
-            return "Port ‘\(port)’ on cell \(cell) is invalid for its type."
-        }
-    }
+public enum ConstraintSolverError: Error {
+    case cycleDetected
 }
 
-/// Provides constraint‐solving utilities for `RepStruct`.
-public struct ConstraintSolver {
-    /// Attempt to solve all constraints on a Rep.
-    ///
-    /// - Parameter rep: the `RepStruct` to normalize.
-    /// - Returns: a new, constraint‐satisfying `RepStruct`.
-    /// - Throws: `ConstraintError` if unsolvable.
-    public static func solve(_ rep: RepStruct) throws -> RepStruct {
-        var mutable = rep
-
-        // 1. Collect all cells and their trait vectors.
-        // 2. For each, enforce trait rules (e.g. normalize sum to 1.0).
-        // 3. Collect all port edges, enforce type rules.
-        // 4. If any rule fails, throw ConstraintError.
-        // 5. Return the adjusted Rep.
-
-        // TODO: implement your solver here.
-        return mutable
-    }
-
-    /// Quickly check if the Rep currently satisfies all constraints.
-    ///
-    /// - Parameter rep: the `RepStruct` to check.
-    /// - Returns: first `ConstraintError` found, or `nil` if valid.
-    public static func validate(_ rep: RepStruct) -> ConstraintError? {
-        // TODO: scan each cell.traits and cell.ports,
-        // return a ConstraintError if any rule is broken.
-        return nil
+public enum ConstraintSolver {
+    /// Returns an order of elements respecting directed edges.
+    /// - Parameters:
+    ///   - items: all nodes
+    ///   - edges: tuples (from, to)
+    public static func topologicalSort<T: Hashable>(
+        items: Set<T>,
+        edges: [(T, T)]
+    ) throws -> [T] {
+        var inDegree = [T: Int]()
+        var graph = [T: [T]]()
+        for item in items {
+            inDegree[item] = 0; graph[item] = []
+        }
+        for (u, v) in edges {
+            graph[u]?.append(v)
+            inDegree[v]? += 1
+        }
+        var queue = items.filter { inDegree[$0] == 0 }
+        var order: [T] = []
+        while !queue.isEmpty {
+            let u = queue.removeFirst()
+            order.append(u)
+            for v in graph[u]! {
+                inDegree[v]! -= 1
+                if inDegree[v]! == 0 {
+                    queue.append(v)
+                }
+            }
+        }
+        if order.count != items.count {
+            throw ConstraintSolverError.cycleDetected
+        }
+        return order
     }
 }

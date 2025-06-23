@@ -1,87 +1,60 @@
 //
 //  AutomataDSL.swift
-//  ToolExp
+//  EngineKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Fluent API for defining finite-state machines.
+//  • Builds a lightweight StateMachine struct.
 //
-
+//  Discussion:
+//  Automata model typical workflows: tutorial steps, UI states,
+//  or custom DSL-driven processes within Tool.
 //
-// AutomataDSL.swift
-// EngineKit — DSL for scheduling & parsing iCal VEVENT automations.
+//  Rationale:
+//  • DSL closure chaining improves readability.
+//  • Generated StateMachine can be persisted or inspected.
 //
-// Responsibilities:
-//
-//  1. Provide a Swift‐native API to build one‐off and recurring reminders.
-//  2. Parse raw VEVENT text into structured rule objects.
-//  3. Generate next‐trigger dates from RRULEs.
-//  4. Integrate with AutomationsServ for runtime scheduling.
+//  Dependencies: none (Foundation only)
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// A single occurrence or recurring rule for an automation.
-public enum AutomationRule {
-    /// A one‐time event at `date`.
-    case once(date: Date, title: String)
-    /// A recurring rule (RRULE) with optional EXDATEs.
-    case recurring(rrule: RRule, title: String, exceptions: [Date])
-}
+public class AutomataDSL {
+    private var states: [String] = []
+    private var transitions: [(from: String, to: String, event: String)] = []
 
-/// Simplified model for an iCal RRULE.
-public struct RRule {
-    public let frequency: String       // E.g. "DAILY", "WEEKLY"
-    public let interval: Int           // Repeat interval
-    public let byDay: [String]?        // E.g. ["MO","WE","FR"]
-    public let count: Int?             // Number of occurrences
-    public let until: Date?            // End date
+    /// Adds a new state to the machine.
+    @discardableResult
+    public func state(_ name: String) -> AutomataDSL {
+        if !states.contains(name) {
+            states.append(name)
+        }
+        return self
+    }
 
-    public init(
-        frequency: String,
-        interval: Int = 1,
-        byDay: [String]? = nil,
-        count: Int? = nil,
-        until: Date? = nil
-    ) {
-        self.frequency = frequency
-        self.interval = interval
-        self.byDay = byDay
-        self.count = count
-        self.until = until
+    /// Adds a transition triggered by an event.
+    @discardableResult
+    public func transition(from: String, to: String, on event: String) -> AutomataDSL {
+        transitions.append((from: from, to: to, event: event))
+        return self
+    }
+
+    /// Compiles the DSL into a `StateMachine`.
+    public func build() -> StateMachine {
+        return StateMachine(states: states, transitions: transitions)
     }
 }
 
-/// Entry point for Automata DSL.
-public struct AutomataDSL {
-    /// Build a one‐time rule.
-    public static func once(on date: Date, title: String) -> AutomationRule {
-        return .once(date: date, title: title)
-    }
+public struct StateMachine {
+    public let states: [String]
+    public let transitions: [(from: String, to: String, event: String)]
 
-    /// Build a recurring rule.
-    public static func recurring(
-        frequency: String,
-        interval: Int = 1,
-        byDay: [String]? = nil,
-        count: Int? = nil,
-        until: Date? = nil,
-        title: String
-    ) -> AutomationRule {
-        let rule = RRule(
-            frequency: frequency,
-            interval: interval,
-            byDay: byDay,
-            count: count,
-            until: until
-        )
-        return .recurring(rrule: rule, title: title, exceptions: [])
-    }
-
-    /// Parse raw VEVENT text into `AutomationRule`s.
-    public static func parse(vevent: String) throws -> [AutomationRule] {
-        // TODO:
-        // 1. Lex lines (BEGIN:VEVENT … END:VEVENT).
-        // 2. Extract DTSTART, SUMMARY, RRULE, EXDATE.
-        // 3. Return array of AutomationRule.
-        return []
+    /// Fires an event from the current state, returns next state.
+    public func fire(event: String, from current: String) -> String? {
+        return transitions.first {
+            $0.from == current && $0.event == event
+        }?.to
     }
 }

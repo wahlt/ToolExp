@@ -1,57 +1,54 @@
 //
 //  Tutorial.swift
-//  ToolExp
+//  AIKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Manages sequences of TutorialStep for interactive tutorials.
+//  • Advances steps based on user actions.
 //
-
+//  Discussion:
+//  Tutorials guide new users through core features. By modeling
+//  each step as an immutable struct, we decouple UI from logic.
 //
-// Tutorial.swift
-// AIKit — In-app guided tutorial flows.
+//  Rationale:
+//  • Step IDs allow deep-linking/bookmarking progress.
+//  • Action prompts can be checked by analytics or AI for hints.
 //
-// Defines a sequence of tutorial steps that can be advanced or replayed.
+//  Dependencies: none (Foundation only)
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// A single tutorial step.
 public struct TutorialStep {
-    /// Unique identifier for the step.
     public let id: String
-    /// The title shown to the user.
     public let title: String
-    /// Detailed instruction text.
-    public let instruction: String
-    /// Optional predicate to check completion.
-    public let completionCheck: () -> Bool
+    public let description: String
+    public let actionPrompt: String
 }
 
-/// The tutorial manager actor.
-public actor TutorialManager {
-    private var steps: [TutorialStep]
-    private var currentIndex: Int = 0
+public class TutorialManager {
+    private(set) public var steps: [TutorialStep]
+    private var index: Int = 0
 
-    /// Initialize with a list of steps.
     public init(steps: [TutorialStep]) {
         self.steps = steps
     }
 
-    /// Get the current tutorial step.
-    public func currentStep() -> TutorialStep? {
-        guard currentIndex < steps.count else { return nil }
-        return steps[currentIndex]
+    /// Returns current step, or nil if complete.
+    public var current: TutorialStep? {
+        guard steps.indices.contains(index) else { return nil }
+        return steps[index]
     }
 
-    /// Advance to the next step if the current is complete.
-    public func advanceIfNeeded() {
-        guard let step = currentStep(),
-              step.completionCheck()
-        else { return }
-        currentIndex += 1
+    /// Marks current step complete and advances.
+    public func completeCurrent() {
+        index += 1
     }
 
-    /// Reset the tutorial back to the first step.
+    /// Resets tutorial progress.
     public func reset() {
-        currentIndex = 0
+        index = 0
     }
 }

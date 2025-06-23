@@ -1,57 +1,40 @@
 //
 //  AgentSFX.swift
-//  ToolExp
+//  RenderKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Audio-visual special effects for the AI Agent persona.
+//  • Uses AVFoundation for sounds and UIKit for haptics.
 //
-
+//  Discussion:
+//  Agent interactions benefit from audio cues and subtle haptics.
 //
-// AgentSFX.swift
-// RenderKit — 3D/Audio effect wrapper for AI/Agent feedback.
-//
-// Responsibilities:
-//  • Play brief particle, sound, or haptic feedback when an AI action occurs.
-//  • Batch GPU commands for visual effects alongside the main render pass.
+//  Rationale:
+//  • Keep SFX logic isolated for easy replacement of assets.
+//  Dependencies: AVFoundation, UIKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import MetalKit
 import AVFoundation
-import RepKit
+import UIKit
 
-/// Manages a shared pool of sound players and particle emitters.
-public final class AgentSFX {
-    /// Singleton access.
-    public static let shared = AgentSFX()
+public class AgentSFX {
+    private var player: AVAudioPlayer?
 
-    private var audioPlayers: [String: AVAudioPlayer] = [:]
-    private var device: MTLDevice?
-    private var commandQueue: MTLCommandQueue?
-
-    private init() {
-        // TODO: initialize Metal `device` & `commandQueue`
-    }
-
-    /// Play a short SFX by name (e.g. "ding", "error").
+    /// Plays a named sound file from the bundle.
     public func playSound(named name: String) {
-        if let player = audioPlayers[name] {
-            player.play()
-        } else if let url = Bundle.main.url(forResource: name, withExtension: "wav") {
-            let player = try? AVAudioPlayer(contentsOf: url)
-            audioPlayers[name] = player
-            player?.play()
+        guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else { return }
+        DispatchQueue.global().async {
+            self.player = try? AVAudioPlayer(contentsOf: url)
+            self.player?.play()
         }
     }
 
-    /// Emit a brief particle effect at the given 3D position.
-    public func emitParticles(
-        name: String,
-        at position: SIMD3<Float>,
-        in view: MTKView
-    ) {
-        guard let queue = commandQueue else { return }
-        let cmdBuf = queue.makeCommandBuffer()
-        // TODO: encode particle compute or render pass here
-        cmdBuf?.commit()
+    /// Triggers a light haptic impact.
+    public func hapticLight() {
+        let gen = UIImpactFeedbackGenerator(style: .light)
+        gen.impactOccurred()
     }
 }

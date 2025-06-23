@@ -1,44 +1,37 @@
 //
 //  Evaluate.swift
-//  ToolExp
+//  InvestigateKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Computes numerical metrics on Rep graphs (e.g., density).
+//  • Returns a standardized report for ranking variants.
 //
-
+//  Discussion:
+//  Investigation workflows compare multiple Rep mutations.
+//  Evaluate provides uniform scoring for “best of N” selection.
 //
-// Evaluate.swift
-// InvestigateKit — Evaluate facet APIs, run queries against Reps.
-//
-// Responsibilities:
-//
-//  1. Parse user queries or DSL expressions.
-//  2. Execute queries (counts, filters, aggregations).
-//  3. Return typed results for UI or further analysis.
+//  Rationale:
+//  • Decouples metric logic from UI or pipeline code.
+//  Dependencies: RepKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import RepKit
 
-public enum EvaluationResult {
-    case int(Int)
-    case double(Double)
-    case bool(Bool)
-    case string(String)
-    case list([EvaluationResult])
-    case error(String)
+public struct EvaluationReport {
+    public let nodeCount: Int
+    public let edgeCount: Int
+    public let density: Double
 }
 
-public struct Evaluate {
-    /// Evaluate a query string against `rep`.
-    ///
-    /// - Parameter query: custom DSL or predicate.
-    /// - Parameter rep: the `RepStruct` to query.
-    /// - Returns: an `EvaluationResult`.
-    public static func run(_ query: String, on rep: RepStruct) -> EvaluationResult {
-        // TODO:
-        // 1. Tokenize query (e.g. "count cells where trait.x > 0.5").
-//      2. Traverse rep, apply predicate, aggregate data.
-//      3. Return structured result.
-        return .error("Not implemented")
+public enum Evaluate {
+    /// Produces an evaluation report for a given Rep.
+    public static func report(for repID: UUID) async throws -> EvaluationReport {
+        let (nodes, edges) = try await RepStruct.shared.loadGraph(for: repID)
+        let n = nodes.count, m = edges.count
+        let dens = m == 0 ? 0 : Double(m) / Double(n*(n-1)/2)
+        return EvaluationReport(nodeCount: n, edgeCount: m, density: dens)
     }
 }

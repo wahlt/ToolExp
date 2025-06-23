@@ -1,41 +1,30 @@
 //
 //  NavigateSearch.swift
-//  ToolExp
+//  DataServ
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Performs case-insensitive substring search on string arrays.
+//  • Returns items containing the query.
 //
-
+//  Discussion:
+//  Basic search UI uses this helper to filter lists on keystrokes.
+//  More advanced fuzzy search can build on top of this API.
 //
-// NavigateSearch.swift
-// DataServ — Searching and navigation tools for Reps.
+//  Rationale:
+//  • Keeps search logic out of ViewControllers.
+//  • Ensures consistent behavior across Tool.
 //
-// Provides utilities to locate cells by label or pattern.
+//  Dependencies: Foundation
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
 
-public extension RepStruct {
-    /// Find the first cell with exactly the given label.
-    ///
-    /// - Parameter label: the exact label string to match.
-    /// - Returns: the `Cell` if found, else `nil`.
-    func findCell(named label: String) -> Cell? {
-        return cells.values.first { $0.label == label }
-    }
-
-    /// Find all cells whose label matches the given regular expression.
-    ///
-    /// - Parameter regex: a `String` regex pattern.
-    /// - Throws: `NSRegularExpression` errors if the pattern is invalid.
-    /// - Returns: an array of matching `Cell`s.
-    func searchCells(matching regex: String) throws -> [Cell] {
-        let rx = try NSRegularExpression(pattern: regex)
-        return cells.values.filter {
-            rx.firstMatch(
-                in: $0.label,
-                range: NSRange($0.label.startIndex..< $0.label.endIndex, in: $0.label)
-            ) != nil
-        }
+public enum NavigateSearch {
+    /// Filters strings array by query substring (CI).
+    public static func strings(_ items: [String], matching query: String) -> [String] {
+        let q = query.lowercased()
+        return items.filter { $0.lowercased().contains(q) }
     }
 }

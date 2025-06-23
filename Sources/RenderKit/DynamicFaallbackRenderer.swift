@@ -1,59 +1,58 @@
 //
-//  DynamicFaallbackRenderer.swift
-//  ToolExp
+//  DynamicFallbackRenderer.swift
+//  RenderKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Fallback renderer when high-end pipelines fail or unsupported.
+//  • Uses simple MetalKit drawing routines for basic visuals.
 //
-
+//  Discussion:
+//  On devices lacking ray-tracing or advanced shaders, this renderer
+//  ensures the scene still displays, albeit without full effects.
 //
-// DynamicFallbackRenderer.swift
-// RenderKit — CPU‐fallback for Metal4 pipelines on unsupported devices.
+//  Rationale:
+//  • Graceful degradation avoids blank screens.
+//  • Centralizes fallback logic away from primary pipelines.
 //
-// Responsibilities:
-//  • Detect if device lacks Metal4 / MLX support.
-//  • Switch to a CPU‐based path tracer or OpenCL fallback.
-//  • Mirror the API of `RendUltraEng` so callers need only one interface.
+//  Dependencies: MetalKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import MetalKit
-import RepKit
 
-public final class DynamicFallbackRenderer: Renderer {
-    private let device: MTLDevice?
-    private let queue: MTLCommandQueue?
-    private let cpuEnabled: Bool
-    private let cpuTracer: CPUPathTracer
+public class DynamicFallbackRenderer {
+    private let device: MTLDevice
+    private let pipelineState: MTLRenderPipelineState
 
-    public init(mtkView: MTKView) {
-        self.device = mtkView.device
-        self.queue  = device?.makeCommandQueue()
-        // Detect Metal4 support
-        self.cpuEnabled = !(device?.supportsFamily(.apple7) ?? false)
-        self.cpuTracer = CPUPathTracer()
-    }
-
-    public func render(_ rep: RepStruct, in view: MTKView) {
-        if cpuEnabled {
-            // CPU fallback
-            let image = cpuTracer.trace(rep)
-            view.drawable?.texture.replace(
-                region: MTLRegionMake2D(0, 0, image.width, image.height),
-                mipmapLevel: 0,
-                withBytes: image.data,
-                bytesPerRow: image.bytesPerRow
-            )
-        } else {
-            // Metal4 path via `RendUltraEng`
-            RendUltraEng.shared.render(rep, in: view)
+    public init(view: MTKView) throws {
+        guard let dev = MTLCreateSystemDefaultDevice() else {
+            throw NSError(domain: "DynamicFallbackRenderer", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "No Metal device"])
         }
+        self.device = dev
+        view.device = dev
+        let lib = try dev.makeDefaultLibrary(bundle: .main)
+        let desc = MTLRenderPipelineDescriptor()
+        desc.vertexFunction   = lib.makeFunction(name: "fallbackVertex")
+        desc.fragmentFunction = lib.makeFunction(name: "fallbackFragment")
+        desc.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        self.pipelineState = try dev.makeRenderPipelineState(descriptor: desc)
     }
-}
 
-/// Simple CPU path tracer stub.
-fileprivate class CPUPathTracer {
-    func trace(_ rep: RepStruct) -> (width: Int, height: Int, data: UnsafeRawPointer, bytesPerRow: Int) {
-        // TODO: implement a minimal ray‐marching CPU fallback
-        return (1,1,UnsafeRawPointer(bitPattern: 0)!,0)
+    /// Renders a frame using basic geometry.
+    public func render(to view: MTKView) {
+        guard let drawable = view.currentDrawable,
+              let desc     = view.currentRenderPassDescriptor else { return }
+        let cmdQ = device.makeCommandQueue()!
+        let cmdB = cmdQ.makeCommandBuffer()!
+        let enc  = cmdB.makeRenderCommandEncoder(descriptor: desc)!
+        enc.setRenderPipelineState(pipelineState)
+        // Basic draw: full-screen triangle
+        enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        enc.endEncoding()
+        cmdB.present(drawable)
+        cmdB.commit()
     }
 }

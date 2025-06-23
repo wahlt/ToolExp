@@ -1,28 +1,46 @@
 //
 //  ResourceServ.swift
-//  ToolExp
+//  ServiceKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Centralized access to bundled assets: images, shaders, help files.
+//  • Provides localized string lookups.
 //
-
+//  Discussion:
+//  Avoid scattering Bundle.main lookups across modules.
 //
-// ResourceServ.swift
-// ServiceKit — Central manager for loading & caching external resources (images, models).
+//  Rationale:
+//  • Single API for asset retrieval.
+//  • Facilitates unit testing by mocking ResourceServ.
+//
+//  Dependencies: Foundation, UIKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import UIKit
 
-public actor ResourceServ {
-    private let cache = NSCache<NSURL, NSData>()
+public class ResourceServ {
+    public static let shared = ResourceServ()
+    private init() {}
 
-    /// Load resource data from a URL, with in-memory caching.
-    public func load(url: URL) async throws -> Data {
-        if let cached = cache.object(forKey: url as NSURL) {
-            return cached as Data
+    /// Loads an image from the main bundle.
+    public func image(named: String) -> UIImage? {
+        return UIImage(named: named)
+    }
+
+    /// Loads a .metal shader source file.
+    public func shaderSource(named: String) -> String? {
+        guard let url = Bundle.main.url(forResource: named, withExtension: "metal") else {
+            return nil
         }
-        let (data, _) = try await URLSession.shared.data(from: url)
-        cache.setObject(data as NSData, forKey: url as NSURL)
-        return data
+        return try? String(contentsOf: url)
+    }
+
+    /// Returns a localized string.
+    public func localized(_ key: String, table: String? = nil) -> String {
+        return NSLocalizedString(key, tableName: table, bundle: .main, comment: "")
     }
 }
+

@@ -1,56 +1,87 @@
 //
 //  AIMentor.swift
-//  ToolExp
+//  AIKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Singleton façade to OpenAIAdaptor for AI-driven mentoring.
+//  • Enforces rate-limits and serializes requests to avoid API throttling.
+//  • Parses JSON responses into plain text and handles errors gracefully.
 //
-
+//  Discussion:
+//  We want “in-situ” AI advice with minimal latency. Using a singleton
+//  centralizes network configuration but requires care to avoid blocking
+//  the main thread. Rate-limiting prevents overloading the AI service.
 //
-// AIMentor.swift
-// AIKit — The top-level AI coach, orchestrating lower-level AI helpers.
+//  Rationale:
+//  • Singleton ensures one URLSession and one rate-limit tracker.
+//  • DispatchQueue with qos .userInitiated prioritizes UX responsiveness.
+//  • Encapsulation hides networking details behind a simple ask(_:).
 //
-// Uses OpenAIAdaptor from BridgeKit to generate context-aware suggestions.
-// Ultimately drives in-app coaching, assisted modeling, and “gut-feel” shortcuts.
+//  Dependencies: IntegrationKit.OpenAIAdaptor
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
-import BridgeKit
+import IntegrationKit
 
-/// Protocol defining basic AI suggestion capabilities.
-public protocol AIMentorProtocol {
-    /// Given the current Rep and optional user context, produce a suggestion.
+public final class AIMentor {
+    /// Shared singleton instance.
+    public static let shared = AIMentor()
+    private init() {}
+
+    /// Queue to serialize and throttle requests.
+    private let queue = DispatchQueue(label: "AIKit.AIMentorQueue", qos: .userInitiated)
+    private var lastRequest: Date?
+    private let minInterval: TimeInterval = 1.0  // seconds
+
+    /// Ask the mentor a question.
+    ///
     /// - Parameters:
-    ///   - rep: the current RepStruct
-    ///   - context: optional free-form user or UI context
-    /// - Returns: a human-readable suggestion
-    func suggestNextAction(for rep: RepStruct, context: String?) async throws -> String
-}
-
-/// The “mentor” actor that coordinates AI workflows.
-public actor AIMentor: AIMentorProtocol {
-    private let aiService: OpenAIAdaptor
-
-    /// Initialize with a shared OpenAI adaptor.
-    public init(aiService: OpenAIAdaptor = .shared) {
-        self.aiService = aiService
+    ///   - prompt: Natural-language question or context.
+    ///   - completion: Returns AI text or Error.
+    public func ask(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void) {
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            let now = Date()
+            if let last = self.lastRequest, now.timeIntervalSince(last) < self.minInterval {
+                let delay = self.minInterval - now.timeIntervalSince(last)
+                self.queue.asyncAfter(deadline: .now() + delay) {
+                    self.send(prompt, completion: completion)
+                }
+            } else {
+                self.send(prompt, completion: completion)
+            }
+        }
     }
 
-    /// Produce a suggestion by prompting the AI with Rep state and context.
-    public func suggestNextAction(for rep: RepStruct, context: String? = nil) async throws -> String {
-        // 1) Serialize rep summary
-        let summary = "Rep '\(rep.name)' has \(rep.cells.count) cells."
-        // 2) Build prompt
-        var prompt = """
-        You are an AI mentor for a graphical modeling tool.
-        The current scene: \(summary)
-        """
-        if let ctx = context {
-            prompt += "\nUser context: \(ctx)"
+    /// Internal network call via OpenAIAdaptor.
+    private func send(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void) {
+        lastRequest = Date()
+        let params = OpenAICompletionParameters(
+            model: "gpt-4-mini",
+            prompt: prompt,
+            maxTokens: 256,
+            temperature: 0.7,
+            topP: 1.0
+        )
+        OpenAIAdaptor.shared.complete(parameters: params) { result in
+            switch result {
+            case .success(let resp):
+                if let text = resp.choices.first?.text {
+                    let tidy = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    completion(.success(tidy))
+                } else {
+                    let err = NSError(
+                        domain: "AIKit.AIMentor",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Malformed AI response"]
+                    )
+                    completion(.failure(err))
+                }
+            case .failure(let err):
+                completion(.failure(err))
+            }
         }
-        prompt += "\nSuggest a next action the user can take."
-        // 3) Send to AI
-        let response = try await aiService.complete(prompt: prompt, maxTokens: 150)
-        return response.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

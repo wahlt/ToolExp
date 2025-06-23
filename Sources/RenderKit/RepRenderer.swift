@@ -1,38 +1,56 @@
 //
 //  RepRenderer.swift
-//  ToolExp
+//  RenderKit
 //
-//  Created by Thomas Wahl on 6/16/25.
+//  Specification:
+//  • Specialized renderer for Rep graphs: draws nodes & edges.
+//  • Supports 2D force-layout and 3D “bubble” views.
 //
-
+//  Discussion:
+//  Visualizing RepStruct requires mapping cell positions and
+//  port links into screen-space primitives.
 //
-// RepRenderer.swift
-// RenderKit — Transforms `RepStruct` into GPU buffers.
-//
-// Responsibilities:
-//  • Flatten cell meshes, transforms, and trait tensors.
-//  • Create Metal buffers for vertex, index, and trait data.
-//  • Provide binding indices for all pipelines (basic, ultra, SFX).
+//  Rationale:
+//  • Separate from ArtEngine to allow different visual styles.
+//  Dependencies: MetalKit, RepKit
+//  Created by Thomas Wahl on 06/22/2025.
+//  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import MetalKit
 import RepKit
 
-public final class RepRenderer {
+public class RepRenderer {
     private let device: MTLDevice
+    private let pipeline: MTLRenderPipelineState
 
-    public init(device: MTLDevice) {
-        self.device = device
+    public init(view: MTKView) throws {
+        guard let dev = MTLCreateSystemDefaultDevice(),
+              let lib = try? dev.makeDefaultLibrary(bundle: .main),
+              let vf = lib.makeFunction(name: "repVertex"),
+              let ff = lib.makeFunction(name: "repFragment") else {
+            throw NSError(domain: "RepRenderer", code: -1, userInfo: nil)
+        }
+        self.device = dev
+        let desc = MTLRenderPipelineDescriptor()
+        desc.vertexFunction   = vf
+        desc.fragmentFunction = ff
+        desc.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        pipeline = try dev.makeRenderPipelineState(descriptor: desc)
     }
 
-    /// Uploads all Rep data to GPU buffers.
-    /// - Returns: a struct of `MTLBuffer`s for vertices, indices, transforms.
-    public func uploadBuffers(for rep: RepStruct) -> (vertex: MTLBuffer, index: MTLBuffer, transform: MTLBuffer) {
-        // 1) Iterate rep.cells → collect mesh vertices & indices
-        // 2) Lay out in contiguous arrays
-        // 3) Create `device.makeBuffer(bytes:length:options:)`
-        // 4) Return a tuple of buffers
-        fatalError("TODO: implement uploadBuffers")
+    /// Draws the given RepStruct into the view.
+    public func render(rep: RepStruct, in view: MTKView) {
+        guard let drawable = view.currentDrawable,
+              let desc     = view.currentRenderPassDescriptor else { return }
+        let buf = device.makeCommandQueue()!.makeCommandBuffer()!
+        let enc = buf.makeRenderCommandEncoder(descriptor: desc)!
+        enc.setRenderPipelineState(pipeline)
+        // Convert rep.cells → vertex arrays & draw lines
+        // TODO: full layout & indexing logic
+        enc.endEncoding()
+        buf.present(drawable)
+        buf.commit()
     }
 }
