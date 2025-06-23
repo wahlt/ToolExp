@@ -1,60 +1,64 @@
-//
-//  TensorKit.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/22/25.
-//
-
-//
-//  TensorKit.swift
+// File: Sources/ToolMath/TensorKit.swift
 //  ToolMath
 //
 //  Specification:
-//  • Basic tensor operations on nested arrays.
-//  • Supports reshape, transpose, contraction (Einstein summation).
+//  • Provides CPU-based fallback tensor operations.
+//  • Exposes `TensorKit.matMul` for matrix multiplication.
 //
 //  Discussion:
-//  Light-weight pure-Swift fallback for MLX tiling logic.
+//  The public API is a simple `matMul` that delegates to a private
+//  `ComputeFallback` implementation. In future, GPU or BLAS-optimized
+//  backends can be slotted in here without changing callers.
 //
 //  Rationale:
-//  • Prototype tensor flows without metal compile.
-//  Dependencies: Foundation
+//  • Isolates CPU fallback from public API.
+//  • Ensures functionality even if MLXIntegration is unavailable.
+//
+//  TODO:
+//  • Benchmark and optimize fallback.
+//  • Add GPU-accelerated paths under ToolTensor SuperStage.
+//
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-public enum TensorKit {
-    /// Reshapes a flat array into a 2D matrix.
-    public static func reshape(
-        flat data: [Float],
-        rows: Int,
-        cols: Int
-    ) -> [[Float]] {
-        precondition(rows*cols == data.count, "Shape mismatch")
-        return stride(from: 0, to: data.count, by: cols).map { idx in
-            Array(data[idx..<idx+cols])
-        }
+public struct TensorKit {
+    /// Multiply two matrices A (m×n) and B (n×p) → (m×p).
+    public static func matMul(_ A: [[Float]], _ B: [[Float]]) -> [[Float]] {
+        ComputeFallback.matMul(A, B)
     }
-    
-    /// Transposes a 2D matrix.
-    public static func transpose(_ A: [[Float]]) -> [[Float]] {
-        let rows = A.count, cols = A.first?.count ?? 0
-        var B = Array(repeating: Array(repeating: Float(0), count: rows), count: cols)
-        for i in 0..<rows {
-            for j in 0..<cols {
-                B[j][i] = A[i][j]
+}
+
+/// Private CPU-based implementation of matrix multiplication.
+/// Using nested loops, O(m·n·p) time, suffices as a fallback.
+private enum ComputeFallback {
+    /// Performs basic matrix multiplication.
+    /// - Parameters:
+    ///   - A: m×n matrix
+    ///   - B: n×p matrix
+    /// - Returns: m×p result matrix
+    static func matMul(_ A: [[Float]], _ B: [[Float]]) -> [[Float]] {
+        let m = A.count
+        let n = A.first?.count ?? 0
+        let p = B.first?.count ?? 0
+
+        // Initialize result with zeros
+        var result = Array(
+            repeating: Array(repeating: Float(0), count: p),
+            count: m
+        )
+
+        // Standard triple-loop multiplication
+        for i in 0..<m {
+            for k in 0..<n {
+                let aik = A[i][k]
+                for j in 0..<p {
+                    result[i][j] += aik * B[k][j]
+                }
             }
         }
-        return B
-    }
-    
-    /// Contracts two 2D tensors on shared axis.
-    public static func contract(
-        _ A: [[Float]],
-        _ B: [[Float]]
-    ) -> [[Float]] {
-        return ComputeFallback.matMul(A, B)
+        return result
     }
 }

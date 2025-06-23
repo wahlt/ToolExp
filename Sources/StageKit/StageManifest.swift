@@ -1,25 +1,20 @@
-//
-//  StageManifest.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/22/25.
-//
-
-//
-//  StageManifest.swift
+// File: Sources/StageKit/StageManifest.swift
 //  StageKit
 //
 //  Specification:
-//  • Manifest of all SuperStages and their configs.
-//  • Reads/writes JSON to bundle or remote endpoint.
+//  • Aggregates all StageConfig entries with a default active stage.
 //
 //  Discussion:
-//  StageManifest drives the dropdown in ToolDev and default loading
-//  in ToolExp, mapping stage IDs to their StageConfig.
+//  The manifest drives the stage‐selection UI and initial load on app launch.
+//  It can be overridden by JSON for remote configuration if needed.
 //
 //  Rationale:
-//  • Central registry for dynamic stage discovery.
-//  • Codable for easy bundling or over-the-air updates.
+//  • Centralizes stage metadata in one Codable, Sendable type.
+//  • Enables dynamic addition/removal of SuperStages without code changes.
+//
+//  TODO:
+//  • Implement validation that `defaultStage` exists in `configs`.
+//  • Support runtime updates to the manifest from a server.
 //
 //  Dependencies: Foundation
 //  Created by Thomas Wahl on 06/22/2025.
@@ -28,6 +23,14 @@
 
 import Foundation
 
-public struct StageManifest: Codable {
-    public var configs:      [String: StageConfig]
+public struct StageManifest: Codable, Sendable {
+    /// Mapping of stage names to their configs
+    public var configs: [String: StageConfig]
+    /// Key of the default stage to load on startup
     public var defaultStage: String
+
+    public init(configs: [String: StageConfig], defaultStage: String) {
+        self.configs = configs
+        self.defaultStage = defaultStage
+    }
+}

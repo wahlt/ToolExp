@@ -1,20 +1,25 @@
-//
-//  Cell.swift
+// File: Sources/RepKit/Cell.swift
 //  RepKit
 //
 //  Specification:
-//  • Fundamental unit of Rep: uniquely identified, stores metadata,
-//    ports to other cells, and optional spatial properties.
+//  • A single graph “cell” holding ports, metadata, position, and velocity.
+//  • Conforms to Codable, Equatable, and Sendable for safe actor use.
 //
 //  Discussion:
-//  Cells form the nodes of Rep graphs. They carry arbitrary
-//  key/value data and connection ports mapping names→cellIDs.
+//  The `data` dictionary uses [String:AnyCodable], which is now Sendable by extension above.
+//  Each cell may list outgoing ports to other cell UUIDs for graph traversal and physics.
 //
 //  Rationale:
-//  • Keep minimal to allow extension via traits or facets.
-//  • Codable for JSON‐based persistence and network sync.
+//  • Value type protects against unintended shared state.
+//  • Sendable conformance silences actor isolation warnings when cells cross actor boundaries.
+//  • Codable conformance supports persistence and replication.
 //
-//  Dependencies: Foundation, simd
+//  TODO:
+//  • Add additional physical properties (mass, charge) to support more complex simulations.
+//  • Validate port UUIDs against existing cells in RepIntegrityChecker.
+//
+//  Dependencies: Foundation, simd, AnyCodable
+//
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
 //
@@ -22,22 +27,28 @@
 import Foundation
 import simd
 
-public struct Cell: Codable, Equatable {
+public struct Cell: Codable, Equatable, Sendable {
+    /// Unique identifier for this cell
     public let id: UUID
-    public var data: [String: AnyCodable]
+    /// Named output ports mapping to target cell UUIDs
     public var ports: [String: UUID]
-    public var position: SIMD3<Float>
-    public var velocity: SIMD3<Float>
+    /// Arbitrary key/value metadata attached to this cell
+    public var data: [String: AnyCodable]
+    /// Current 2D position for physics/rendering
+    public var position: SIMD2<Float>
+    /// Current 2D velocity for physics integration
+    public var velocity: SIMD2<Float>
 
-    public init(id: UUID = UUID(),
-                data: [String: AnyCodable] = [:],
-                ports: [String: UUID] = [:],
-                position: SIMD3<Float> = .zero,
-                velocity: SIMD3<Float> = .zero)
-    {
+    public init(
+        id: UUID,
+        ports: [String: UUID] = [:],
+        data: [String: AnyCodable] = [:],
+        position: SIMD2<Float> = .zero,
+        velocity: SIMD2<Float> = .zero
+    ) {
         self.id = id
-        self.data = data
         self.ports = ports
+        self.data = data
         self.position = position
         self.velocity = velocity
     }

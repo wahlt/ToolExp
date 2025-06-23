@@ -1,15 +1,29 @@
 //
-//  ToolExpApp.swift
+//  main.swift
+//  ToolExp
+//
+//  Created by Thomas Wahl on 6/23/25.
+//
+
+// File: Sources/ToolApp/main.swift
+//
+//  main.swift
 //  ToolApp
 //
 //  Specification:
-//  • SwiftUI App entrypoint for ToolExp target.
+//  • Entry point for the ToolExp executable target.
+//  • Defines the @main SwiftUI App structure.
 //
 //  Discussion:
-//  Sets up initial environment, loads last used stage and rep.
+//  Swift Package Manager requires an executable target to contain a
+//  `main.swift` or a file with a `@main` attribute. By placing the
+//  @main-annotated App struct in `main.swift`, SPM will recognize
+//  `ToolApp` as an executable.
 //
 //  Rationale:
-//  • @main simplifies launch.
+//  • Ensures the `ToolApp` target satisfies SPM’s executable requirements.
+//  • Serves as the launch point for the SwiftUI-based ToolExp application.
+//
 //  Dependencies: SwiftUI, ServiceKit, StageKit
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.

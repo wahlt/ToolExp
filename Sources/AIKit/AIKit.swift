@@ -1,20 +1,19 @@
+// File: AIKit/AIKit.swift
 //
 //  AIKit.swift
 //  AIKit
 //
 //  Specification:
 //  • Central registry for AI services in Tool.
-//  • Exposes mentor, summarizer, and future AI utilities via static properties.
+//  • Uses protocol-based injection for mentor.
 //
 //  Discussion:
-//  Bundling AI entry points under one namespace simplifies imports
-//  and signals that these are core AI capabilities of Tool.
+//  When writing tests or swapping AI backends, simply assign
+//  `AIKit.mentor = MyMockMentor()` before launching the UI.
 //
 //  Rationale:
-//  • Enforces consistency when adding new AI helpers.
-//  • Avoids scattered singleton references across modules.
-//
-//  Dependencies: AIMentor
+//  • Testable, replaceable without changing callers.
+//  Dependencies: AIMentorProtocol
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
 //
@@ -22,9 +21,13 @@
 import Foundation
 
 public enum AIKit {
-    /// Context-sensitive mentor.
-    public static var mentor: AIMentor { AIMentor.shared }
-
-    // Future expansions:
-    // public static var summarizer: AISummarizer { ... }
+    /// The current global Mentor instance.
+    public static var mentor: AIMentorProtocol {
+        get { AIMentor.shared }
+        set {
+            if let m = newValue as? AIMentor {
+                AIMentor.shared = m
+            }
+        }
+    }
 }

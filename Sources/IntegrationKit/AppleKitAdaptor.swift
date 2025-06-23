@@ -1,52 +1,60 @@
-//
-//  AppleKitAdaptor.swift
+// File: Sources/IntegrationKit/AppleKitAdaptor.swift
 //  IntegrationKit
 //
 //  Specification:
-//  • Bridges Tool to native Apple services: Shortcuts, Handoff, Notifications.
-//  • Wraps calls in safe API for availability checks.
+//  • Adapts native AppleKit frameworks (Intents, Notifications) for ToolExp.
+//  • UIKit usage is guarded so the module still builds on non-UIKit platforms.
 //
 //  Discussion:
-//  To integrate with Shortcuts and Handoff, we need a thin layer
-//  that hides iOS version checks and entitlement requirements.
+//  Uses `#if canImport(UIKit)` to conditionally import and reference
+//  UIKit types without breaking macOS or visionOS builds.
 //
 //  Rationale:
-//  • Prevent compile-time errors when using newer APIs.
-//  • Provide fallbacks or no-ops on unsupported OS versions.
-//  Dependencies: UIKit, Intents, UserNotifications
+//  • Supports Siri/Shortcut integrations on iOS.
+//  • Maintains cross-platform compatibility in the package.
+//
+//  TODO:
+//  • Implement actual intent handlers and notification scheduling.
+//  • Add unit tests for intent responses.
+//
+//  Dependencies: Foundation, Intents, UserNotifications, UIKit (optional)
+//
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
 //
 
+import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 import Intents
 import UserNotifications
 
-public enum AppleKitAdaptor {
-    /// Registers a Shortcut intent from an INIntent.
-    public static func registerShortcut(_ intent: INIntent) {
-        if #available(iOS 16, *) {
-            let shortcut = INShortcut(intent: intent)
-            let interaction = INInteraction(shortcut: shortcut, intentResponse: nil)
-            interaction.donate(completion: nil)
-        }
-    }
+public struct AppleKitAdaptor {
+    public init() {}
 
-    /// Handoff user activity continuation.
-    public static func continueUserActivity(_ activity: NSUserActivity) {
-        UIApplication.shared.requestSceneSessionActivation(nil, userActivity: activity, options: nil) { error in
-            if let err = error {
-                print("Handoff failed:", err)
-            }
-        }
+    #if canImport(UIKit)
+    /// Presents a quick action banner using UIKit.
+    public func showBanner(title: String, subtitle: String?) {
+        // TODO: implement using UIApplication.shared.keyWindow…
     }
+    #endif
 
-    /// Schedules a local notification.
-    public static func scheduleNotification(title: String, body: String, after sec: TimeInterval) {
+    /// Schedules a simple local notification.
+    public func scheduleNotification(
+        title: String, body: String, after seconds: TimeInterval
+    ) {
         let content = UNMutableNotificationContent()
-        content.title = title; content.body = body
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: sec, repeats: false)
-        let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+        content.title = title
+        content.body  = body
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: seconds, repeats: false
+        )
+        let req = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: trigger
+        )
+        UNUserNotificationCenter.current().add(req)
     }
 }

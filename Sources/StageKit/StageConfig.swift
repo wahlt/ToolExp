@@ -1,25 +1,21 @@
-//
-//  StageConfig.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/22/25.
-//
-
-//
-//  StageConfig.swift
+// File: Sources/StageKit/StageConfig.swift
 //  StageKit
 //
 //  Specification:
-//  • User-visible config for a SuperStage.
-//  • Defines overlays, gesture bindings, and take loadouts.
+//  • Configuration structure for a single SuperStage.
+//  • Holds overlays, gesture bindings, and “takes” loadouts.
 //
 //  Discussion:
-//  ToolDev presents StageConfig for customization of each
-//  SuperStage’s UI and behavior at runtime.
+//  ToolDev, ToolExp, ToolTensor, etc. are all represented as StageConfig
+//  entries in the central StageManifest for dynamic UI generation.
 //
 //  Rationale:
-//  • Codable for JSON-backed presets.
-//  • Direct mapping to StageManifest for discovery.
+//  • Isolates per-stage metadata into a single codable struct.
+//  • Sendable conformance allows stage configs to flow through actor contexts safely.
+//
+//  TODO:
+//  • Validate that `overlays` and `takeLoadouts` refer to existing resource names.
+//  • Support theme overrides per stage.
 //
 //  Dependencies: Foundation
 //  Created by Thomas Wahl on 06/22/2025.
@@ -28,9 +24,25 @@
 
 import Foundation
 
-public struct StageConfig: Codable {
-    public let name:            String
-    public var overlays:       [String]
-    public var gestureBindings: [GestureBinding]
-    public var takeLoadouts:   [String]
+public struct StageConfig: Codable, Sendable {
+    /// Human‐readable name of the stage
+    public let name: String
+    /// Names of HUD overlays to enable by default
+    public var overlays: [String]
+    /// Gesture‐to‐action bindings
+    public var gestureBindings: [String]
+    /// Preconfigured UI “takes” to load on entry
+    public var takeLoadouts: [String]
+
+    public init(
+        name: String,
+        overlays: [String] = [],
+        gestureBindings: [String] = [],
+        takeLoadouts: [String] = []
+    ) {
+        self.name = name
+        self.overlays = overlays
+        self.gestureBindings = gestureBindings
+        self.takeLoadouts = takeLoadouts
+    }
 }

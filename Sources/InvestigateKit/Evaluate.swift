@@ -1,18 +1,23 @@
-//
-//  Evaluate.swift
+// File: Sources/InvestigateKit/Evaluate.swift
 //  InvestigateKit
 //
 //  Specification:
-//  • Computes numerical metrics on Rep graphs (e.g., density).
-//  • Returns a standardized report for ranking variants.
+//  • Defines `EvaluationReport` and `RepEvaluator` to analyze RepStruct graphs.
 //
 //  Discussion:
-//  Investigation workflows compare multiple Rep mutations.
-//  Evaluate provides uniform scoring for “best of N” selection.
+//  Imports RepKit (now declared as a dependency) to access Cell and RepStruct.
+//  Performs cycle detection and topological sort, returning metrics in the report.
 //
 //  Rationale:
-//  • Decouples metric logic from UI or pipeline code.
-//  Dependencies: RepKit
+//  • Centralizes analysis logic for debugging overlays and diagnostics.
+//  • Codable & Sendable conformance allows report transport across actor contexts.
+//
+//  TODO:
+//  • Expose cycle paths and depth metrics in the report.
+//  • Integrate with HUDOverlayManager for in-app visualization.
+//
+//  Dependencies: Foundation, RepKit
+//
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
 //
@@ -20,18 +25,37 @@
 import Foundation
 import RepKit
 
-public struct EvaluationReport {
-    public let nodeCount: Int
-    public let edgeCount: Int
-    public let density: Double
+public struct EvaluationReport: Codable, Sendable {
+    public let isAcyclic: Bool
+    public let sortedIDs: [UUID]
+    public let errors:    [Error]
 }
 
-public enum Evaluate {
-    /// Produces an evaluation report for a given Rep.
-    public static func report(for repID: UUID) async throws -> EvaluationReport {
-        let (nodes, edges) = try await RepStruct.shared.loadGraph(for: repID)
-        let n = nodes.count, m = edges.count
-        let dens = m == 0 ? 0 : Double(m) / Double(n*(n-1)/2)
-        return EvaluationReport(nodeCount: n, edgeCount: m, density: dens)
+public struct RepEvaluator {
+    /// Analyze the rep and produce an `EvaluationReport`.
+    public static func evaluate(rep: RepStruct) -> EvaluationReport {
+        var errors: [Error] = []
+        do {
+            try RepIntegrityChecker.check(rep)
+        } catch {
+            errors.append(error)
+        }
+        let acyclic = errors.isEmpty
+        var sorted: [UUID] = []
+        if acyclic {
+            let edges = rep.cells.flatMap { cell in
+                cell.ports.values.map { (cell.id, $0) }
+            }
+            do {
+                sorted = try ConstraintSolver.topologicalSort(edges)
+            } catch {
+                errors.append(error)
+            }
+        }
+        return EvaluationReport(
+            isAcyclic: acyclic,
+            sortedIDs: sorted,
+            errors:    errors
+        )
     }
 }

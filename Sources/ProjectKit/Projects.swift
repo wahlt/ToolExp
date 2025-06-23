@@ -1,16 +1,22 @@
-//
-//  Projects.swift
+// File: Sources/ProjectKit/Projects.swift
 //  ProjectKit
 //
 //  Specification:
-//  • Model for Tool projects: metadata, file paths, last modified.
-//  • CRUD via DataServ for persistence.
+//  • Model for a user project, conforming to `Persistable`.
+//  • Minimal stub to demonstrate DataServ integration.
 //
 //  Discussion:
-//  Projects encapsulate workspaces; modeling helps list and switch them.
+//  `Project` holds basic metadata (ID + name).
+//  Actual `save()` / `loadAll()` implementations live in DataServ.
 //
 //  Rationale:
-//  • Use Persistable to leverage JSON storage.
+//  • Illustrates how business models import and use the DataServ protocol.
+//  • Keeps model code clean of storage details.
+//
+//  TODO:
+//  • Add thumbnail, lastUpdated, tags, and other fields.
+//  • Implement versioned migrations when loading older data.
+//
 //  Dependencies: Foundation, DataServ
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
@@ -19,22 +25,25 @@
 import Foundation
 import DataServ
 
-public struct Project: Persistable {
-    public static let storageKey = "projects"
-    public var id: UUID
+public struct Project: Persistable, Sendable {
+    /// Unique identifier for this project
+    public let id: UUID
+    /// Human‐readable name
     public var name: String
-    public var path: String
-    public var lastModified: Date
-}
 
-public enum ProjectManager {
-    /// Fetches all saved projects.
-    public static func all() throws -> [Project] {
-        return try DataServ.shared.loadAll(Project.self)
+    /// Designated initializer
+    public init(id: UUID = UUID(), name: String) {
+        self.id = id
+        self.name = name
     }
 
-    /// Saves or updates a project list.
-    public static func save(_ list: [Project]) throws {
-        try DataServ.shared.saveAll(list, as: Project.self)
+    /// Persistable conformance: forwarded to DataServ implementation
+    public func save() throws {
+        try ProjectStore.shared.save(self)
+    }
+
+    /// Persistable conformance: forwarded to DataServ implementation
+    public static func loadAll() throws -> [Project] {
+        return try ProjectStore.shared.loadAll()
     }
 }

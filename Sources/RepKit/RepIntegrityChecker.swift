@@ -1,23 +1,22 @@
-//
-//  RepIntegrityChecker.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/22/25.
-//
-
-//
-//  RepIntegrityChecker.swift
+// File: Sources/RepKit/RepIntegrityChecker.swift
 //  RepKit
 //
 //  Specification:
-//  • Deep integrity checks: no cycles, connectedness, geometry constraints.
-//  • Uses DFS for cycle detection and connectivity tests.
+//  • Verifies that the directed graph defined by cell.ports has no cycles.
+//  • Throws `RepIntegrityError.cycleDetected` on first detected loop.
 //
 //  Discussion:
-//  Some RepGraph operations require cycle‐free, fully‐connected graphs.
+//  We build an `idIndex` to map cell IDs → array indices, then
+//  recursively traverse the graph, tracking a DFS stack for cycle detection.
 //
 //  Rationale:
-//  • Composite checks guarantee stability in physics/layout engines.
+//  • Protects downstream algorithms (layout, physics) from infinite loops.
+//  • Provides fast bail‐out on malformed rep graphs.
+//
+//  TODO:
+//  • Report path of the detected cycle for debugging.
+//  • Integrate with ToolProof to mark invalid reps visually.
+//
 //  Dependencies: Foundation
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
@@ -25,43 +24,56 @@
 
 import Foundation
 
+/// Errors that can occur during integrity checking.
 public enum RepIntegrityError: Error {
+    /// A cycle was found in the directed graph.
     case cycleDetected
-    case disconnectedComponents
 }
 
-public enum RepIntegrityChecker {
-    /// Runs full integrity suite on a RepStruct.
+/// Performs a DFS‐based cycle check on a `RepStruct`.
+public struct RepIntegrityChecker {
+    /// Check for cycles in the rep; throws on the first found.
+    /// - Parameter rep: the rep structure to analyze.
     public static func check(_ rep: RepStruct) throws {
-        // 1) Cycle detection
+        // Map each cell’s UUID to its array index
+        let idIndex = Dictionary(
+            uniqueKeysWithValues: rep.cells.enumerated().map { ($1.id, $0) }
+        )
+
         var visited = Set<UUID>()
-        var stack = Set<UUID>()
+        var stack   = Set<UUID>()
+
         func dfs(_ id: UUID) throws {
-            if stack.contains(id) { throw RepIntegrityError.cycleDetected }
-            guard !visited.contains(id),
-                  let cell = rep.cells.first(where: { $0.id == id }) else { return }
+            // If this ID is already on the current DFS stack → cycle
+            if stack.contains(id) {
+                throw RepIntegrityError.cycleDetected
+            }
+            // If we’ve fully visited this node before, skip
+            if visited.contains(id) {
+                return
+            }
             visited.insert(id)
             stack.insert(id)
-            for target in cell.ports.values {
-                try dfs(target)
+
+            // Lookup index and cell
+            guard let idx = idIndex[id] else {
+                stack.remove(id)
+                return
             }
+            let cell = rep.cells[idx]
+
+            // Recurse into each outgoing port
+            for targetID in cell.ports.values {
+                try dfs(targetID)
+            }
+
+            // Pop this ID off the DFS stack
             stack.remove(id)
         }
-        for cell in rep.cells { try dfs(cell.id) }
 
-        // 2) Connectivity: all nodes reachable from first
-        if let start = rep.cells.first?.id {
-            var reachable = Set<UUID>()
-            func collect(_ id: UUID) {
-                if reachable.contains(id) { return }
-                reachable.insert(id)
-                let cell = rep.cells.first { $0.id == id }!
-                for t in cell.ports.values { collect(t) }
-            }
-            collect(start)
-            if reachable.count != rep.cells.count {
-                throw RepIntegrityError.disconnectedComponents
-            }
+        // Kick off DFS from each cell
+        for cell in rep.cells {
+            try dfs(cell.id)
         }
     }
 }

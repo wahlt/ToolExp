@@ -1,37 +1,27 @@
+// File: DataServ/Port.swift
 //
 //  Port.swift
 //  DataServ
 //
 //  Specification:
-//  • Publisher/subscriber conduit for streaming values of type T.
-//  • Built atop Combine’s PassthroughSubject.
+//  • Legacy publisher/subscriber conduit, now aliased to RepKit.Port.
+//  • Deprecated in favor of a single `Port<T>` in RepKit.
 //
 //  Discussion:
-//  Ports model Rep update channels and event streams.
-//  Subscribers listen for new data or Rep mutation events.
+//  Consolidating `Port<T>` implementations avoids confusion.
 //
 //  Rationale:
-//  • Combine is first-class in Swift 6.2.
-//  • PassthroughSubject ensures non-blocking streams.
+//  • DataServ events should reuse the same reactive type as core RepKit.
+//  TODO:
+//    – [ ] Remove this alias once all uses point to RepKit.Port.
 //
-//  Dependencies: Combine
+//  Dependencies: RepKit
 //  Created by Thomas Wahl on 06/22/2025.
 //  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import Combine
+import RepKit
 
-public class Port<T> {
-    private let subject = PassthroughSubject<T, Never>()
-
-    /// Publish a new value to all subscribers.
-    public func send(_ value: T) {
-        subject.send(value)
-    }
-
-    /// AnyPublisher to subscribe to updates.
-    public func publisher() -> AnyPublisher<T, Never> {
-        subject.eraseToAnyPublisher()
-    }
-}
+@available(*, deprecated, message: "Use RepKit.Port<T> instead")
+public typealias Port<T> = RepKit.Port<T>

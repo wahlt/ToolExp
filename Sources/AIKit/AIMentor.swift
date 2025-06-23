@@ -1,21 +1,19 @@
+// File: AIKit/AIMentor.swift
 //
 //  AIMentor.swift
 //  AIKit
 //
 //  Specification:
-//  • Singleton façade to OpenAIAdaptor for AI-driven mentoring.
-//  • Enforces rate-limits and serializes requests to avoid API throttling.
-//  • Parses JSON responses into plain text and handles errors gracefully.
+//  • Protocol-based façade to OpenAIAdaptor for AI-driven mentoring.
+//  • Supports dependency injection for testability.
 //
 //  Discussion:
-//  We want “in-situ” AI advice with minimal latency. Using a singleton
-//  centralizes network configuration but requires care to avoid blocking
-//  the main thread. Rate-limiting prevents overloading the AI service.
+//  Swapping the hard-coded singleton for a protocol allows mocking
+//  the AI backend in unit tests and future service backends.
 //
 //  Rationale:
-//  • Singleton ensures one URLSession and one rate-limit tracker.
-//  • DispatchQueue with qos .userInitiated prioritizes UX responsiveness.
-//  • Encapsulation hides networking details behind a simple ask(_:).
+//  • Improves test coverage by decoupling network client.
+//  • Keeps API surface identical for callers.
 //
 //  Dependencies: IntegrationKit.OpenAIAdaptor
 //  Created by Thomas Wahl on 06/22/2025.
@@ -25,21 +23,35 @@
 import Foundation
 import IntegrationKit
 
-public final class AIMentor {
-    /// Shared singleton instance.
-    public static let shared = AIMentor()
-    private init() {}
+/// Protocol for any AI completion service.
+public protocol AICompletionAdapting {
+    func complete(
+        parameters: OpenAICompletionParameters,
+        completion: @escaping (Result<OpenAICompletionResponse, Error>) -> Void
+    )
+}
 
-    /// Queue to serialize and throttle requests.
+/// Protocol for the Mentor façade.
+public protocol AIMentorProtocol {
+    func ask(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void)
+}
+
+/// Concrete Mentor implementation, depends on `AICompletionAdapting`.
+public final class AIMentor: AIMentorProtocol {
+    /// Publicly replaceable shared instance for DI.
+    public static var shared: AIMentorProtocol = AIMentor(adaptor: OpenAIAdaptor.shared)
+
+    private let adaptor: AICompletionAdapting
     private let queue = DispatchQueue(label: "AIKit.AIMentorQueue", qos: .userInitiated)
     private var lastRequest: Date?
     private let minInterval: TimeInterval = 1.0  // seconds
 
+    /// Designated initializer for injecting any AICompleter.
+    public init(adaptor: AICompletionAdapting) {
+        self.adaptor = adaptor
+    }
+
     /// Ask the mentor a question.
-    ///
-    /// - Parameters:
-    ///   - prompt: Natural-language question or context.
-    ///   - completion: Returns AI text or Error.
     public func ask(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void) {
         queue.async { [weak self] in
             guard let self = self else { return }
@@ -55,7 +67,6 @@ public final class AIMentor {
         }
     }
 
-    /// Internal network call via OpenAIAdaptor.
     private func send(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void) {
         lastRequest = Date()
         let params = OpenAICompletionParameters(
@@ -65,20 +76,14 @@ public final class AIMentor {
             temperature: 0.7,
             topP: 1.0
         )
-        OpenAIAdaptor.shared.complete(parameters: params) { result in
+        adaptor.complete(parameters: params) { result in
             switch result {
             case .success(let resp):
-                if let text = resp.choices.first?.text {
-                    let tidy = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    completion(.success(tidy))
-                } else {
-                    let err = NSError(
-                        domain: "AIKit.AIMentor",
-                        code: -1,
-                        userInfo: [NSLocalizedDescriptionKey: "Malformed AI response"]
-                    )
-                    completion(.failure(err))
+                guard let text = resp.choices.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+                    completion(.failure(NSError(domain: "AIKit.AIMentor", code: -1, userInfo: [NSLocalizedDescriptionKey: "Malformed AI response"])))
+                    return
                 }
+                completion(.success(text))
             case .failure(let err):
                 completion(.failure(err))
             }
