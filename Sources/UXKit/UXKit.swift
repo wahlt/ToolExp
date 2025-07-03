@@ -1,37 +1,32 @@
 //
 //  UXKit.swift
-//  ToolExp
+//  UXKit
 //
-//  Created by Thomas Wahl on 6/16/25.
-//
+//  1. Purpose
+//     Umbrella import for all UXKit functionality.
+// 2. Dependencies
+//     Foundation, SwiftUI
+// 3. Overview
+//     Exposes main types: `StageKit`, `DomKit`, `CompoundGestureManager`, etc.
+// 4. Usage
+//     `import UXKit` in host app.
+// 5. Notes
+//     No executable code here.
 
-//
-// UXKit.swift
-// UXKit — Foundation for all Tool UI.
-//
-// Re-exports common types, environment keys, theme modifiers.
-//
+@_exported import SwiftUI
+@_exported import RepKit
+@_exported import RenderKit
 
-import SwiftUI
-
-public extension View {
-    /// Apply the standard Tool padding & background.
-    func toolPanel() -> some View {
-        self
-            .padding(8)
-            .background(Color(white: 0.95))
-            .cornerRadius(6)
-    }
-}
-
-// Environment key for the global theme color.
-private struct ThemeColorKey: EnvironmentKey {
-    static let defaultValue: Color = .blue
-}
-
-public extension EnvironmentValues {
-    var toolThemeColor: Color {
-        get { self[ThemeColorKey.self] }
-        set { self[ThemeColorKey.self] = newValue }
-    }
-}
+@_exported import UXKit_CompoundGestureManager
+@_exported import UXKit_DominionManager
+@_exported import UXKit_DomKit
+@_exported import UXKit_FacetActionRouter
+@_exported import UXKit_FacetHandler
+@_exported import UXKit_GestureCaptureManager
+@_exported import UXKit_GesturingMechanics
+@_exported import UXKit_GPUFilterService
+@_exported import UXKit_GPUOverlayComposer
+@_exported import UXKit_MagicKit
+@_exported import UXKit_MetalGestureOverlayView
+@_exported import UXKit_StageKit
+@_exported import UXKit_StageManager

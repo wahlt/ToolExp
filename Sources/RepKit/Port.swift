@@ -1,39 +1,31 @@
-// File: Sources/DataServ/Port.swift
-//  DataServ
 //
-//  Specification:
-//  • Previously imported RepKit to alias or deprecate its `Port` type.
-//  • Now decoupled: DataServ defines its own `Port` helper, or simply removes the import.
+//  Port.swift
+//  RepKit
 //
-//  Discussion:
-//  DataServ should not depend on RepKit.  We remove `import RepKit`
-//  so that DataServ compiles standalone.  If you need a Port type,
-//  define it here or alias it only after RepKit becomes a declared dependency.
-//
-//  Rationale:
-//  • Prevents “no such module ‘RepKit’” errors in DataServ builds.
-//  • Keeps DataServ a pure persistence-layer module.
-//
-//  TODO:
-//  • If a `Port<T>` abstraction is required, implement it here.
-//  • Add unit tests for any port behavior or serialization support.
-//
-//  Dependencies: Foundation
-//
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ToolExp on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
+//  1. Purpose
+//     Models a connection point on a Cell.
+//  2. Dependencies
+//     Foundation
+//  3. Overview
+//     Holds port name and target cell ID.
+//  4. Usage
+//     RepValidator and scaffolding use Ports to connect cells.
+//  5. Notes
+//     Future: support multi-target ports.
 
 import Foundation
 
-/// Placeholder for a port abstraction in DataServ.
-/// Remove or expand this as needed when integrating with RepKit.
-public struct Port<T: Codable>: Codable {
-    public let key: String
-    public let value: T
+/// Represents an outgoing or incoming link port on a Cell.
+public struct Port: Codable, Hashable {
+    public let name: String
+    public let targetID: UUID
 
-    public init(key: String, value: T) {
-        self.key = key
-        self.value = value
+    /// Initializes a Port to link to a cell.
+    public init(name: String, targetID: UUID) {
+        self.name = name
+        self.targetID = targetID
     }
 }

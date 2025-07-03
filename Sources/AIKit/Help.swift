@@ -1,46 +1,26 @@
+// Sources/AIKit/Help.swift
 //
 //  Help.swift
-//  AIKit
+//  ToolExp
 //
-//  Specification:
-//  • Loads and serves Markdown-based help topics.
-//  • Provides lookup by topic ID.
+//  Created by Thomas Wahl on 6/16/25.
 //
-//  Discussion:
-//  In-app help must be fast and offline, so pre-bundle JSON/Markdown.
-//  Topics are keyed by ID to decouple storage from UI.
-//
-//  Rationale:
-//  • Simple dictionary lookup offers O(1) retrieval.
-//  • Bundled topics avoid runtime network dependency.
-//
-//  Dependencies: none (Foundation only)
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
+//  Help — Static help texts for AI tutorial and commands.
 //
 
 import Foundation
 
-public class HelpManager {
-    private var topics: [String: String] = [:]
+public enum Help {
+    public static let opening = """
+    Welcome to ToolExp! 🤖
+    • Type a question below to get started.
+    • Ask “How do I add a node?” for guided examples.
+    """
 
-    public init() {
-        loadBuiltInTopics()
-    }
-
-    /// Returns Markdown help for a given ID, or nil.
-    public func content(for id: String) -> String? {
-        return topics[id]
-    }
-
-    /// Loads default topics from a bundled resource.
-    private func loadBuiltInTopics() {
-        // TODO: Replace with real JSON bundle in production.
-        topics["getting_started"] = """
-        # Getting Started
-        Welcome to Tool! \
-        Use one-finger tap to select, two-finger pinch to zoom, \
-        and three-finger drag for global transforms.
-        """
-    }
+    public static let shortcuts = """
+    AI Shortcuts:
+    • “Explain X” — brief summary
+    • “List steps for Y” — numbered instruction
+    • “Optimize code for Z” — refactor suggestions
+    """
 }

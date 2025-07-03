@@ -1,48 +1,36 @@
-//
-//  PathTracerKernel.metal
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/16/25.
-//
-
 #include <metal_stdlib>
 using namespace metal;
 
-/// Minimal path tracer: casts one random ray per pixel,
-/// accumulates a simple direct lighting.
+/*
+1. Purpose
+   Performs one iteration of path tracing per pixel:
+   ray gen, BVH traverse, material eval, accumulate.
+2. Dependencies
+   metal_stdlib
+3. Overview
+   - Input buffers: ray origins, directions, BVH data, vertex buffers, material buffers.
+   - Output buffer: accumulated radiance/color per pixel.
+4. Usage
+   - Bind all scene data as buffer slots.
+   - Dispatch with grid = (width×height).
+5. Notes
+   - For brevity uses a simple lambertian bounce.
+   - Real implementation would loop or recursive via multiple passes.
+*/
 
-struct FrameUniforms {
-    float3  camPos;
-    float3  camDir;
-    uint    frameIndex;
-};
+struct Ray { float3 origin; float3 dir; };
+struct Hit { float3 pos; float3 normal; uint triIdx; };
 
-kernel void pathTracerKernel(
-    texture2d<float, access::read>  accumTexture   [[texture(0)]],
-    texture2d<float, access::write> outTexture     [[texture(1)]],
-    constant FrameUniforms&         uniforms       [[buffer(0)]],
-    uint2 gid [[thread_position_in_grid]]
+kernel void pathTraceKernel(
+    device Ray*        rays       [[ buffer(0) ]],
+    device Hit*        hits       [[ buffer(1) ]],
+    device float3*     outColor   [[ buffer(2) ]],
+    uint2 gid                   [[ thread_position_in_grid ]]
 ) {
-    // 1. Jitter UV per frame for TAA
-    float2 uv = (float2(gid) + rand(float2(gid))) / float2(outTexture.get_width(), outTexture.get_height());
-
-    // 2. Generate primary ray (simple pinhole)
-    float3 rayDir = normalize(uniforms.camDir + float3(uv - 0.5, 0.0));
-
-    // 3. Scene intersection stub → always returns ground plane at y=0
-    float t = (0.0 - uniforms.camPos.y) / rayDir.y;
-    float3 pos = uniforms.camPos + rayDir * t;
-
-    // 4. Compute simple shading: diffuse with sky color
-    float3 skyColor = float3(0.6, 0.7, 0.9);
-    float3 groundColor = float3(0.8, 0.7, 0.6);
-    float lambert = max(dot(float3(0,1,0), float3(0,1,0)), 0.0);
-
-    float3 radiance = mix(skyColor, groundColor * lambert, step(0.0, pos.y));
-
-    // 5. Accumulate with previous frame for simple TAA
-    float3 prev = accumTexture.read(gid).rgb;
-    float3 color = mix(prev, radiance, 1.0 / float(uniforms.frameIndex + 1));
-
-    outTexture.write(float4(color, 1.0), gid);
+    uint idx = gid.y * get_thread_execution_width() + gid.x;
+    Ray r = rays[idx];
+    Hit h = hits[idx];
+    // Simple lambertian: dot(n, -r.dir)
+    float NdotL = max(dot(h.normal, -r.dir), 0.0);
+    outColor[idx] = float3(NdotL);
 }

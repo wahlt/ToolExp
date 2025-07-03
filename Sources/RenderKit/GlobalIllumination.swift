@@ -2,52 +2,88 @@
 //  GlobalIllumination.swift
 //  RenderKit
 //
-//  Specification:
-//  • Computes indirect lighting via sparse voxel octree tracing.
-//  • Updates a GI buffer each frame for fast lookup in shaders.
-//
-//  Discussion:
-//  Realistic scene lighting requires bounced light; this module
-//  precomputes coarse GI using ray-marching in a voxel grid.
-//
-//  Rationale:
-//  • Improves visual fidelity over direct illumination only.
-//  • Runs as a background pass to avoid frame drops.
-//
-//  Dependencies: Metal
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Combines direct lighting and probe-based indirect lighting
+//     into a final illumination pass.
+// 2. Dependencies
+//     Metal, MLXIntegration, MetalPerformanceShadersGraph
+// 3. Overview
+//     Fetches direct lighting via standard shader pass,
+//     calls GIProbeRenderer for probes, then blends results
+//     via an MPSGraph fusion kernel.
+// 4. Usage
+//     Call `GlobalIllumination.render(scene:directTexture:)`
+//     to get a fully lit texture.
+// 5. Notes
+//     Falls back to simple add if probe pass unavailable.
 
-import Foundation
 import Metal
+import MLXIntegration
+import MetalPerformanceShadersGraph
 
-public class GlobalIllumination {
+public final class GlobalIllumination {
     private let device: MTLDevice
-    private let pipeline: MTLComputePipelineState
-    private let gridBuffer: MTLBuffer
+    private let graph: MPSGraph
 
-    public init(device: MTLDevice, gridSize: Int) throws {
+    public init(device: MTLDevice = MLXCommandQueue.shared.device) {
         self.device = device
-        let lib = try device.makeDefaultLibrary(bundle: .main)
-        guard let fn = lib.makeFunction(name: "giComputeKernel") else {
-            throw NSError(domain: "GlobalIllumination", code: -1, userInfo: nil)
-        }
-        pipeline = try device.makeComputePipelineState(function: fn)
-        gridBuffer = device.makeBuffer(length: MemoryLayout<Float>.size * gridSize * gridSize * gridSize,
-                                       options: .storageModePrivate)!
+        self.graph  = MPSGraph()
+        buildGraph()
     }
 
-    /// Executes the GI compute pass.
-    public func compute(commandBuffer: MTLCommandBuffer, gridSize: Int) {
-        let encoder = commandBuffer.makeComputeCommandEncoder()!
-        encoder.setComputePipelineState(pipeline)
-        encoder.setBuffer(gridBuffer, offset: 0, index: 0)
-        let threads = MTLSize(width: 8, height: 8, depth: 8)
-        let groups  = MTLSize(width: (gridSize+7)/8,
-                              height:(gridSize+7)/8,
-                              depth:(gridSize+7)/8)
-        encoder.dispatchThreadgroups(groups, threadsPerThreadgroup: threads)
-        encoder.endEncoding()
+    private var directTexPH: MPSGraphTensor!
+    private var probeTexPH: MPSGraphTensor!
+    private var outputTexT: MPSGraphTensor!
+
+    /// Builds a fusion graph: output = direct + weight * probe
+    private func buildGraph() {
+        // placeholders
+        directTexPH = graph.placeholder(
+            shape: nil,  // dynamic [H,W,4]
+            dataType: .float32,
+            name: "GI_direct"
+        )
+        probeTexPH = graph.placeholder(
+            shape: nil,
+            dataType: .float32,
+            name: "GI_probe"
+        )
+        // weight constant (e.g. 0.5 indirect)
+        let w = graph.constant(0.5, shape: [], dataType: .float32, name: "GI_indirectWeight")
+        // multiply probe by weight, then add
+        let scaled = graph.multiply(probeTexPH, w, name: "GI_scaledProbe")
+        outputTexT  = graph.add(directTexPH, scaled, name: "GI_output")
+    }
+
+    /// Runs the GI fusion.
+    ///
+    /// - Parameters:
+    ///   - direct: Shader-rendered direct lighting texture.
+    ///   - probes: Probe texture from `GIProbeRenderer`.
+    /// - Returns: Final blended texture.
+    public func render(
+        direct: MTLTexture,
+        probes: MTLTexture
+    ) throws -> MTLTexture {
+        // 1) Convert MTLTextures → MLXArray via MLXRenderer
+        let renderer = MLXRenderer(device: device)
+        let directArr = try MLXArray(from: direct)
+        let probeArr  = try MLXArray(from: probes)
+
+        // 2) Convert to TensorData
+        let dData = try directArr.toMPSGraphTensorData()
+        let pData = try probeArr.toMPSGraphTensorData()
+
+        // 3) Run fusion graph
+        let results = try graph.run(
+            feeds: [ directTexPH: dData,
+                     probeTexPH: pData ],
+            targetTensors: [outputTexT],
+            targetOperations: nil
+        )
+        let outArr = try MLXArray(ndArray: results[outputTexT]!.ndArray)
+
+        // 4) Back to texture
+        return try renderer.makeTexture(from: outArr)
     }
 }

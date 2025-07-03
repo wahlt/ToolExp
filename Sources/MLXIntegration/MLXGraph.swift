@@ -1,49 +1,47 @@
-// File: Sources/MLXIntegration/MLXGraph.swift
 //
 //  MLXGraph.swift
 //  MLXIntegration
 //
-//  Specification:
-//  • Encapsulates an ML inference pass using a Metal compute encoder.
+//  Convenience wrapper around MPSGraph for quick add/run usage.
 //
-//  Discussion:
-//  Binds input/output MLXTensor textures to indices, dispatches
-//  compute kernels, and finalizes encoding. Currently a stub.
-//
-//  Rationale:
-//  • Separates graph‐inference logic from queue management.
-//  • Provides a single place to integrate custom ML shaders.
-//
-//  Dependencies: Metal
-//  Created by Thomas Wahl on 06/17/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
-import Metal
+import MetalPerformanceShadersGraph
 
 public final class MLXGraph {
-    private let model: MLXModel
+    private let graph: MPSGraph
 
-    /// Wraps a loaded MLXModel for inference graph execution.
-    public init(model: MLXModel) {
-        self.model = model
+    public init() {
+        self.graph = MPSGraph()
     }
 
-    /// Encodes an inference pass: bind inputs, bind outputs, dispatch.
-    /// - Note: Stubbed; replace with real shader bindings & threadgroup logic.
-    public func encodeInference(
-        on encoder: MTLComputeCommandEncoder,
-        inputs: [MLXTensor],
-        outputs: [MLXTensor]
-    ) {
-        // Example pseudocode:
-        // for (i, t) in inputs.enumerated() {
-        //     encoder.setTexture(t.texture, index: i)
-        // }
-        // for (j, t) in outputs.enumerated() {
-        //     encoder.setTexture(t.texture, index: inputs.count + j)
-        // }
-        // encoder.dispatchThreadgroups(/*…*/)
-        encoder.endEncoding()
+    /// Runs the graph with the given feeds and returns the tensor outputs.
+    /// - Parameters:
+    ///   - feeds: Mapping from placeholder tensors to their data.
+    ///   - targetTensors: List of tensors to return.
+    /// - Returns: Mapping tensor→TensorData.
+    public func run(
+        feeds: [MPSGraphTensor: MPSGraphTensorData],
+        targetTensors: [MPSGraphTensor]
+    ) throws -> [MPSGraphTensor: MPSGraphTensorData] {
+        let device = MPSGraphDevice.default()!
+        let executable = try graph.compile(
+            with: Array(feeds.keys),
+            targetTensors: targetTensors,
+            targetOperations: nil,
+            device: device
+        )
+        let cmdBuf = MLXCommandQueue.shared.queue.makeCommandBuffer()!
+        let results = try executable.encode(
+            to: cmdBuf,
+            feeds: feeds,
+            targetTensors: targetTensors,
+            targetOperations: nil
+        )
+        cmdBuf.commit()
+        cmdBuf.waitUntilCompleted()
+        return results
     }
 }

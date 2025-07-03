@@ -1,47 +1,59 @@
-//
-//  OptionBloom.metal
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/16/25.
-//
-
 #include <metal_stdlib>
 using namespace metal;
 
-/// “Option bloom” effect: bright-pass + gaussian blur.
-///   1) Extract pixels above threshold.
-///   2) Apply small blur pass.
-///   3) Write to bloom texture.
+/*
+1. Purpose
+   Extracts bright regions (threshold) and blurs them for bloom.
+2. Dependencies
+   metal_stdlib
+3. Overview
+   - Kernel 1: threshold to isolate highlights.
+   - Kernel 2: separable 7-tap blur on highlights.
+4. Usage
+   - Dispatch `extractBright`, then `bloomHorizontal`, then `bloomVertical`.
+5. Notes
+   - Weight and threshold are constants for now.
+*/
 
-struct BloomParams {
-    float threshold;
-    float intensity;
-};
+constexpr sampler s(address::clamp_to_edge, filter::nearest);
+constexpr float THRESH = 1.0; // only pixels brighter than this
+constexpr float KERNEL7[7] = {1/64, 6/64,15/64,20/64,15/64,6/64,1/64};
 
-kernel void optionBloomKernel(
-    texture2d<float, access::read>  inTexture   [[texture(0)]],
-    texture2d<float, access::write> bloomTexture [[texture(1)]],
-    constant BloomParams&           params       [[buffer(0)]],
-    uint2 gid [[thread_position_in_grid]]
+kernel void extractBright(
+    texture2d<float, access::read>  inTex   [[ texture(0) ]],
+    texture2d<float, access::write> bright  [[ texture(1) ]],
+    uint2 gid                                [[ thread_position_in_grid ]]
 ) {
-    if (gid.x >= inTexture.get_width() || gid.y >= inTexture.get_height()) {
-        return;
-    }
+    if (gid.x >= inTex.get_width() || gid.y >= inTex.get_height()) return;
+    float4 c = inTex.sample(s, float2(gid));
+    float lum = dot(c.rgb, float3(0.299,0.587,0.114));
+    bright.write(lum > THRESH ? c : float4(0), gid);
+}
 
-    float4 color = inTexture.read(gid);
-    float lum = dot(color.rgb, float3(0.299, 0.587, 0.114));
-
-    if (lum > params.threshold) {
-        // simple 3×3 blur around bright pixels
-        float4 sum = float4(0.0);
-        int radius = 1;
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -radius; dy <= radius; dy++) {
-                sum += inTexture.read(uint2(gid + uint2(dx, dy)));
-            }
-        }
-        bloomTexture.write(sum / 9.0 * params.intensity, gid);
-    } else {
-        bloomTexture.write(float4(0.0), gid);
+kernel void bloomHorizontal(
+    texture2d<float, access::read>  inTex  [[ texture(0) ]],
+    texture2d<float, access::write> outTex [[ texture(1) ]],
+    uint2 gid                             [[ thread_position_in_grid ]]
+) {
+    if (gid.x >= inTex.get_width() || gid.y >= inTex.get_height()) return;
+    float4 sum = float4(0.0);
+    int2 c = int2(gid);
+    for (int i=-3; i<=3; i++) {
+        sum += inTex.sample(s, float2(c.x+i,c.y)) * KERNEL7[i+3];
     }
+    outTex.write(sum, gid);
+}
+
+kernel void bloomVertical(
+    texture2d<float, access::read>  inTex  [[ texture(0) ]],
+    texture2d<float, access::write> outTex [[ texture(1) ]],
+    uint2 gid                             [[ thread_position_in_grid ]]
+) {
+    if (gid.x >= inTex.get_width() || gid.y >= inTex.get_height()) return;
+    float4 sum = float4(0.0);
+    int2 c = int2(gid);
+    for (int j=-3; j<=3; j++) {
+        sum += inTex.sample(s, float2(c.x,c.y+j)) * KERNEL7[j+3];
+    }
+    outTex.write(sum, gid);
 }

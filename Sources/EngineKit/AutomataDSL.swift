@@ -2,59 +2,55 @@
 //  AutomataDSL.swift
 //  EngineKit
 //
-//  Specification:
-//  • Fluent API for defining finite-state machines.
-//  • Builds a lightweight StateMachine struct.
+//  A minimal domain-specific language (DSL) for simple state
+//  machine scripts: move, wait, and callback instructions.
 //
-//  Discussion:
-//  Automata model typical workflows: tutorial steps, UI states,
-//  or custom DSL-driven processes within Tool.
-//
-//  Rationale:
-//  • DSL closure chaining improves readability.
-//  • Generated StateMachine can be persisted or inspected.
-//
-//  Dependencies: none (Foundation only)
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
+import simd
 
-public class AutomataDSL {
-    private var states: [String] = []
-    private var transitions: [(from: String, to: String, event: String)] = []
-
-    /// Adds a new state to the machine.
-    @discardableResult
-    public func state(_ name: String) -> AutomataDSL {
-        if !states.contains(name) {
-            states.append(name)
-        }
-        return self
-    }
-
-    /// Adds a transition triggered by an event.
-    @discardableResult
-    public func transition(from: String, to: String, on event: String) -> AutomataDSL {
-        transitions.append((from: from, to: to, event: event))
-        return self
-    }
-
-    /// Compiles the DSL into a `StateMachine`.
-    public func build() -> StateMachine {
-        return StateMachine(states: states, transitions: transitions)
-    }
+/// Single instruction for the automata DSL.
+public enum AutomataInstruction {
+    /// Move an entity to `position` over `duration` seconds.
+    case move(to: SIMD3<Float>, duration: Float)
+    /// Pause execution for `duration` seconds.
+    case wait(duration: Float)
+    /// Execute custom code callback on RepStruct.
+    case callback((inout RepStruct) -> Void)
 }
 
-public struct StateMachine {
-    public let states: [String]
-    public let transitions: [(from: String, to: String, event: String)]
+/// Parser for the AutomataDSL textual script.
+public final class AutomataDSL {
+    /// Parses a script where each line is:
+    ///   - `move x y z t`
+    ///   - `wait t`
+    ///   - `callback` lines not supported in text form.
+    public static func parse(_ script: String) -> [AutomataInstruction] {
+        var instructions: [AutomataInstruction] = []
+        for line in script.split(separator: "\n") {
+            let parts = line.trimmingCharacters(in: .whitespaces).split(separator: " ")
+            guard let cmd = parts.first else { continue }
 
-    /// Fires an event from the current state, returns next state.
-    public func fire(event: String, from current: String) -> String? {
-        return transitions.first {
-            $0.from == current && $0.event == event
-        }?.to
+            switch cmd {
+            case "move" where parts.count == 5:
+                if let x = Float(parts[1]),
+                   let y = Float(parts[2]),
+                   let z = Float(parts[3]),
+                   let t = Float(parts[4]) {
+                    instructions.append(.move(to: SIMD3(x, y, z), duration: t))
+                }
+            case "wait" where parts.count == 2:
+                if let t = Float(parts[1]) {
+                    instructions.append(.wait(duration: t))
+                }
+            default:
+                // Unknown line -> skip
+                continue
+            }
+        }
+        return instructions
     }
 }

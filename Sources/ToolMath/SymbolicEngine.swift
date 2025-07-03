@@ -1,39 +1,66 @@
-// File: Sources/ToolMath/SymbolicEngine.swift
+//
+//  SymbolicEngine.swift
 //  ToolMath
 //
-//  Specification:
-//  • Defines the SymbolicEngine protocol and a dummy stub implementation.
-//
-//  Discussion:
-//  Symbolic expressions can be validated or transformed via an engine.
-//  The dummy engine always returns false but satisfies the interface.
-//
-//  Rationale:
-//  • Separates symbolic logic from the rest of the math toolkit.
-//  • Sendable stub allows asynchronous calls without data races.
-//
-//  TODO:
-//  • Plug in a real symbolic library (e.g. Z3, MathSAT).
-//
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Simplified symbolic expression representation and manipulation.
+// 2. Dependencies
+//     Foundation
+// 3. Overview
+//     Defines `Expr` enum and basic simplifications.
+// 4. Usage
+//     `SymbolicEngine.simplify(.add(.var("x"), .zero))`
+// 5. Notes
+//     Not a full CAS—demo only.
 
 import Foundation
 
-/// Protocol for evaluating symbolic expressions.
-public protocol SymbolicEngine {
-    /// Returns true if the expression is determined to be valid.
-    func evaluate(_ expression: String) -> Bool
+public enum Expr: CustomStringConvertible {
+    case variable(String)
+    case constant(Float)
+    case add(Expr, Expr)
+    case mul(Expr, Expr)
+    case pow(Expr, Float)
+
+    public var description: String {
+        switch self {
+        case .variable(let v): return v
+        case .constant(let c): return String(c)
+        case .add(let a, let b): return "(\(a)+\(b))"
+        case .mul(let a, let b): return "(\(a)*\(b))"
+        case .pow(let a, let p): return "(\(a)^\(p))"
+        }
+    }
 }
 
-/// A Sendable stub that always returns false.
-public struct DummySymbolicEngine: SymbolicEngine, Sendable {
+public final class SymbolicEngine {
     public init() {}
 
-    public func evaluate(_ expression: String) -> Bool {
-        // No real logic; placeholder for future integration.
-        return false
+    /// Simplifies an expression by applying trivial rules.
+    public func simplify(_ expr: Expr) -> Expr {
+        switch expr {
+        case .add(let a, let b):
+            let sa = simplify(a), sb = simplify(b)
+            // x+0 => x
+            if case .constant(0) = sb { return sa }
+            if case .constant(0) = sa { return sb }
+            return .add(sa, sb)
+        case .mul(let a, let b):
+            let sa = simplify(a), sb = simplify(b)
+            // x*1 => x, x*0 => 0
+            if case .constant(1) = sb { return sa }
+            if case .constant(1) = sa { return sb }
+            if case .constant(0) = sb { return .constant(0) }
+            if case .constant(0) = sa { return .constant(0) }
+            return .mul(sa, sb)
+        case .pow(let a, let p):
+            let sa = simplify(a)
+            // x^1 => x, x^0 => 1
+            if p == 1 { return sa }
+            if p == 0 { return .constant(1) }
+            return .pow(sa, p)
+        default:
+            return expr
+        }
     }
 }

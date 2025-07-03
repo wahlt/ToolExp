@@ -1,92 +1,34 @@
-// File: AIKit/AIMentor.swift
+// Sources/AIKit/AIMentor.swift
 //
 //  AIMentor.swift
-//  AIKit
+//  ToolExp
 //
-//  Specification:
-//  • Protocol-based façade to OpenAIAdaptor for AI-driven mentoring.
-//  • Supports dependency injection for testability.
+//  Created by Thomas Wahl on 6/16/25.
 //
-//  Discussion:
-//  Swapping the hard-coded singleton for a protocol allows mocking
-//  the AI backend in unit tests and future service backends.
-//
-//  Rationale:
-//  • Improves test coverage by decoupling network client.
-//  • Keeps API surface identical for callers.
-//
-//  Dependencies: IntegrationKit.OpenAIAdaptor
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
+//  AIMentor — Interactive AI-driven tutorial and hint system.
 //
 
 import Foundation
-import IntegrationKit
+import SwiftUI
 
-/// Protocol for any AI completion service.
-public protocol AICompletionAdapting {
-    func complete(
-        parameters: OpenAICompletionParameters,
-        completion: @escaping (Result<OpenAICompletionResponse, Error>) -> Void
-    )
-}
+/// ViewModel that drives the “mentor” panel in the AIKit tutorial.
+@MainActor
+public class AIMentor: ObservableObject {
+    @Published public var history: [String] = []
+    private let service: AIService
 
-/// Protocol for the Mentor façade.
-public protocol AIMentorProtocol {
-    func ask(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void)
-}
-
-/// Concrete Mentor implementation, depends on `AICompletionAdapting`.
-public final class AIMentor: AIMentorProtocol {
-    /// Publicly replaceable shared instance for DI.
-    public static var shared: AIMentorProtocol = AIMentor(adaptor: OpenAIAdaptor.shared)
-
-    private let adaptor: AICompletionAdapting
-    private let queue = DispatchQueue(label: "AIKit.AIMentorQueue", qos: .userInitiated)
-    private var lastRequest: Date?
-    private let minInterval: TimeInterval = 1.0  // seconds
-
-    /// Designated initializer for injecting any AICompleter.
-    public init(adaptor: AICompletionAdapting) {
-        self.adaptor = adaptor
+    public init(service: AIService = DefaultAIService()) {
+        self.service = service
     }
 
-    /// Ask the mentor a question.
-    public func ask(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void) {
-        queue.async { [weak self] in
-            guard let self = self else { return }
-            let now = Date()
-            if let last = self.lastRequest, now.timeIntervalSince(last) < self.minInterval {
-                let delay = self.minInterval - now.timeIntervalSince(last)
-                self.queue.asyncAfter(deadline: .now() + delay) {
-                    self.send(prompt, completion: completion)
-                }
-            } else {
-                self.send(prompt, completion: completion)
-            }
-        }
-    }
-
-    private func send(_ prompt: String, completion: @escaping (Result<String, Error>) -> Void) {
-        lastRequest = Date()
-        let params = OpenAICompletionParameters(
-            model: "gpt-4-mini",
-            prompt: prompt,
-            maxTokens: 256,
-            temperature: 0.7,
-            topP: 1.0
-        )
-        adaptor.complete(parameters: params) { result in
-            switch result {
-            case .success(let resp):
-                guard let text = resp.choices.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) else {
-                    completion(.failure(NSError(domain: "AIKit.AIMentor", code: -1, userInfo: [NSLocalizedDescriptionKey: "Malformed AI response"])))
-                    return
-                }
-                completion(.success(text))
-            case .failure(let err):
-                completion(.failure(err))
-            }
+    /// Sends the user’s input to the AI and appends the response to `history`.
+    public func send(_ input: String) async {
+        history.append("You: \(input)")
+        do {
+            let reply = try await service.complete(prompt: input, maxTokens: 150)
+            history.append("Mentor: \(reply)")
+        } catch {
+            history.append("Error: \(error.localizedDescription)")
         }
     }
 }

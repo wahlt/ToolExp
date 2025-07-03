@@ -1,44 +1,43 @@
-// File: Sources/MLXIntegration/MLXModel.swift
 //
 //  MLXModel.swift
 //  MLXIntegration
 //
-//  Specification:
-//  • Wraps a compiled CoreML model for GPU inference.
-//  • Exposes input/output feature names.
+//  Loads and runs Core ML models, converting to/from MLXArray.
 //
-//  Discussion:
-//  Loads a `.mlmodelc` bundle, extracts its model description,
-//  and provides the underlying MLModel for advanced usage.
-//
-//  Rationale:
-//  • Separates model-loading from inference and UI code.
-//  • Metadata enables dynamic binding of textures and buffers.
-//
-//  Dependencies: Foundation, CoreML
-//  Created by Thomas Wahl on 06/17/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import CoreML
+import MLX
 
 public final class MLXModel {
-    private let mlModel: MLModel
-    public let inputNames: [String]
-    public let outputNames: [String]
+    private let model: MLModel
 
-    /// Initialize by loading a compiled `.mlmodelc` bundle.
-    public init(compiledModelURL: URL) throws {
-        let model = try MLModel(contentsOf: compiledModelURL)
-        self.mlModel     = model
-        let desc         = model.modelDescription
-        self.inputNames  = Array(desc.inputDescriptionsByName.keys)
-        self.outputNames = Array(desc.outputDescriptionsByName.keys)
+    /// Loads a `.mlmodelc` at `url`.
+    public init(contentsOf url: URL) throws {
+        self.model = try MLModel(contentsOf: url)
     }
 
-    /// Direct access to the underlying CoreML model.
-    public var coreMLModel: MLModel {
-        return mlModel
+    /// Performs a prediction given a single-array input.
+    /// - Parameters:
+    ///   - input: MLXArray of shape matching the model’s input.
+    ///   - inputName: Name of the model’s input in the MLModel spec.
+    ///   - outputName: Name of the desired output in the spec.
+    /// - Returns: Output as MLXArray.
+    public func predict(
+        input: MLXArray,
+        inputName: String,
+        outputName: String
+    ) throws -> MLXArray {
+        // Convert MLXArray → MLMultiArray
+        let multi = try input.toMultiArray()
+        let provider = try MLDictionaryFeatureProvider(dictionary: [inputName: multi])
+        let out = try model.prediction(from: provider)
+        guard let resultMulti = out.featureValue(for: outputName)?.multiArrayValue else {
+            fatalError("MLXModel: missing output \(outputName)")
+        }
+        return try MLXArray(multiArray: resultMulti)
     }
 }

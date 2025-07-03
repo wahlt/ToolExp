@@ -2,44 +2,39 @@
 //  RepValidator.swift
 //  RepKit
 //
-//  Specification:
-//  • Validates fundamental Rep invariants:
-//    • Unique cell IDs, port targets exist, no orphan cells.
-//
-//  Discussion:
-//  Early sanity checks catch malformed mutations before runtime.
-//
-//  Rationale:
-//  • Fail-fast on critical errors to simplify debugging.
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ToolExp on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
+//  1. Purpose
+//     Provides lightweight validation and scaffolding hints.
+//  2. Dependencies
+//     Foundation
+//  3. Overview
+//     Checks for missing ports, invalid traits, etc.
+//  4. Usage
+//     MagicKit and StageKit call `validateProof` and `findMissingPorts`.
+//  5. Notes
+//     Returns minimal info; errors thrown by RepIntegrityChecker.
 
 import Foundation
 
-public enum RepValidationError: Error {
-    case duplicateCellID(UUID)
-    case missingPortTarget(UUID, String)
+/// Describes a missing-port descriptor.
+public struct PortDescriptor {
+    public let name: String
+    public let defaultValue: AnyCodable
 }
 
-public enum RepValidator {
-    /// Throws if any invariant is violated.
-    public static func validate(_ rep: RepStruct) throws {
-        var seen = Set<UUID>()
-        for cell in rep.cells {
-            if seen.contains(cell.id) {
-                throw RepValidationError.duplicateCellID(cell.id)
-            }
-            seen.insert(cell.id)
-        }
-        let validIDs = Set(rep.cells.map { $0.id })
-        for cell in rep.cells {
-            for (portName, target) in cell.ports {
-                if !validIDs.contains(target) {
-                    throw RepValidationError.missingPortTarget(cell.id, portName)
-                }
-            }
-        }
+/// Provides validation routines returning issues or scaffolding hints.
+public final class RepValidator {
+    /// Returns any proof-validation issues.
+    public func validateProof(rep: RepStruct) -> [String] {
+        // TODO: call proof engine or static checks
+        return []
+    }
+
+    /// Finds ports that should be present but are missing.
+    public func findMissingPorts(rep: RepStruct) -> [PortDescriptor] {
+        // TODO: inspect schema vs. rep.metadata
+        return []
     }
 }

@@ -1,33 +1,37 @@
-// File: AIKit/AIKit.swift
+// Sources/AIKit/AIKit.swift
 //
 //  AIKit.swift
-//  AIKit
+//  ToolExp
 //
-//  Specification:
-//  • Central registry for AI services in Tool.
-//  • Uses protocol-based injection for mentor.
+//  Created by Thomas Wahl on 6/16/25.
 //
-//  Discussion:
-//  When writing tests or swapping AI backends, simply assign
-//  `AIKit.mentor = MyMockMentor()` before launching the UI.
+//  AIKit — Core AI service definitions and utilities.
 //
-//  Rationale:
-//  • Testable, replaceable without changing callers.
-//  Dependencies: AIMentorProtocol
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
+//  Defines shared adaptor protocols and a facade over BridgeKit’s adaptors.
 //
 
 import Foundation
+import BridgeKit
 
-public enum AIKit {
-    /// The current global Mentor instance.
-    public static var mentor: AIMentorProtocol {
-        get { AIMentor.shared }
-        set {
-            if let m = newValue as? AIMentor {
-                AIMentor.shared = m
-            }
-        }
+/// Central interface to any AI back-end.
+public protocol AIService {
+    /// Send a completion request to the AI.
+    /// - Parameters:
+    ///   - prompt: the human-readable prompt.
+    ///   - maxTokens: maximum length of the response.
+    func complete(prompt: String, maxTokens: Int) async throws -> String
+}
+
+/// Default AIService implementation backed by OpenAI.
+public struct DefaultAIService: AIService {
+    private let adaptor: OpenAIAdaptor
+
+    public init(adaptor: OpenAIAdaptor = .shared) {
+        self.adaptor = adaptor
+    }
+
+    public func complete(prompt: String, maxTokens: Int) async throws -> String {
+        // Forward directly to the OpenAI adaptor.
+        return try await adaptor.complete(prompt: prompt, maxTokens: maxTokens)
     }
 }

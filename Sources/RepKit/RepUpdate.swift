@@ -1,51 +1,37 @@
-// File: Sources/RepKit/RepUpdate.swift
+//
+//  RepUpdate.swift
 //  RepKit
 //
-//  Specification:
-//  • Enumerates graph-mutation operations on RepStruct cells.
-//  • Conforms to Codable and Sendable for actor-safe update streams.
-//
-//  Discussion:
-//  Each case carries AnyCodable metadata, which is Sendable by extension above.
-//  The `applying(to:)` helper returns a new RepStruct with this update applied.
-//
-//  Rationale:
-//  • Immutable update enum simplifies undo/redo and event sourcing.
-//  • Sendable conformance silences actor isolation warnings in RepStructActor.
-//
-//  TODO:
-//  • Add move/rename port cases and batch update variants for performance.
-//
-//  Dependencies: Foundation, AnyCodable
-//
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ToolExp on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
+//  1. Purpose
+//     Captures discrete updates to a RepStruct over time.
+//  2. Dependencies
+//     Foundation
+//  3. Overview
+//     Holds ID, timestamp, and description of a change.
+//  4. Usage
+//     StageKit publishes RepUpdates for Chronicle views.
+//  5. Notes
+//     Can be extended to include before/after diffs.
 
 import Foundation
 
-public enum RepUpdate: Codable, Sendable {
-    /// Add a new cell with given ID, metadata, and ports
-    case addCell(id: UUID, data: [String: AnyCodable], ports: [String: UUID])
-    /// Remove the cell with the given ID
-    case removeCell(id: UUID)
-    /// Update one metadata key/value in an existing cell
-    case updateData(id: UUID, key: String, value: AnyCodable)
+/// A record of a single change applied to a RepStruct.
+public struct RepUpdate: Codable, Identifiable {
+    public let id: UUID
+    public let timestamp: Date
+    public let description: String
 
-    /// Returns a new RepStruct with this update applied
-    public func applying(to rep: RepStruct) -> RepStruct {
-        var r = rep
-        switch self {
-        case let .addCell(id, data, ports):
-            let newCell = Cell(id: id, ports: ports, data: data)
-            r.cells.append(newCell)
-        case let .removeCell(id):
-            r.cells.removeAll { $0.id == id }
-        case let .updateData(id, key, value):
-            if let idx = r.cells.firstIndex(where: { $0.id == id }) {
-                r.cells[idx].data[key] = value
-            }
-        }
-        return r
+    /// Initializes a RepUpdate.
+    public init(
+        id: UUID = .init(),
+        timestamp: Date = .init(),
+        description: String
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.description = description
     }
 }

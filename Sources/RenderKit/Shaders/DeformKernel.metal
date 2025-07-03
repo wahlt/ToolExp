@@ -1,28 +1,29 @@
-//
-//  DeformKernel.metal
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/16/25.
-//
-
 #include <metal_stdlib>
 using namespace metal;
 
-/// Vertex deformation based on a simple noise field.
-/// Assumes `inPositions` as float3 array and writes to `outPositions`.
+/*
+1. Purpose
+   Applies per-vertex displacement to a mesh via a compute shader.
+2. Dependencies
+   metal_stdlib
+3. Overview
+   - Reads input vertex positions and per-vertex offsets.
+   - Writes deformed positions out.
+4. Usage
+   - Buffer[0]: array<float3> basePositions
+   - Buffer[1]: array<float3> offsets
+   - Buffer[2]: array<float3> outputPositions
+   - Threadgroup size tuned to vertex count.
+5. Notes
+   - No fallback: expects one-to-one mapping.
+*/
 
 kernel void deformKernel(
-    device const float3* inPositions  [[buffer(0)]],
-    device float3*       outPositions [[buffer(1)]],
-    uint                  id          [[thread_position_in_grid]]
+    device const float3* basePos    [[ buffer(0) ]],
+    device const float3* offsets    [[ buffer(1) ]],
+    device float3*       outPos     [[ buffer(2) ]],
+    uint                 idx        [[ thread_position_in_grid ]]
 ) {
-    // 1. Read the input vertex
-    float3 p = inPositions[id];
-
-    // 2. Simple noise deformation (e.g. sin-wave)
-    float noise = sin(p.x * 10.0) * cos(p.y * 10.0);
-    float3 offset = float3(noise * 0.02, noise * 0.02, noise * 0.02);
-
-    // 3. Write the deformed position
-    outPositions[id] = p + offset;
+    // Simply add offset to base position
+    outPos[idx] = basePos[idx] + offsets[idx];
 }

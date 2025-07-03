@@ -1,54 +1,43 @@
+// Sources/AIKit/Tutorial.swift
 //
 //  Tutorial.swift
-//  AIKit
+//  ToolExp
 //
-//  Specification:
-//  • Manages sequences of TutorialStep for interactive tutorials.
-//  • Advances steps based on user actions.
+//  Created by Thomas Wahl on 6/16/25.
 //
-//  Discussion:
-//  Tutorials guide new users through core features. By modeling
-//  each step as an immutable struct, we decouple UI from logic.
-//
-//  Rationale:
-//  • Step IDs allow deep-linking/bookmarking progress.
-//  • Action prompts can be checked by analytics or AI for hints.
-//
-//  Dependencies: none (Foundation only)
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
+//  SwiftUI view hosting the interactive AI tutorial interface.
 //
 
-import Foundation
+import SwiftUI
 
-public struct TutorialStep {
-    public let id: String
-    public let title: String
-    public let description: String
-    public let actionPrompt: String
-}
+public struct TutorialView: View {
+    @StateObject private var mentor = AIMentor()
 
-public class TutorialManager {
-    private(set) public var steps: [TutorialStep]
-    private var index: Int = 0
+    public init() {}
 
-    public init(steps: [TutorialStep]) {
-        self.steps = steps
+    public var body: some View {
+        VStack {
+            ScrollView {
+                ForEach(mentor.history, id: \.self) { line in
+                    Text(line).padding(.vertical, 2)
+                }
+            }
+            .background(Color(.systemBackground))
+            .cornerRadius(8)
+            .padding()
+
+            HStack {
+                TextField("Ask me...", text: $input)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                Button("Send") {
+                    Task { await mentor.send(input) }
+                    input = ""
+                }
+            }
+            .padding()
+        }
+        .padding()
     }
 
-    /// Returns current step, or nil if complete.
-    public var current: TutorialStep? {
-        guard steps.indices.contains(index) else { return nil }
-        return steps[index]
-    }
-
-    /// Marks current step complete and advances.
-    public func completeCurrent() {
-        index += 1
-    }
-
-    /// Resets tutorial progress.
-    public func reset() {
-        index = 0
-    }
+    @State private var input: String = ""
 }

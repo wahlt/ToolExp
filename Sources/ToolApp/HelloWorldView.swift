@@ -1,97 +1,83 @@
-// File: ToolApp/HelloWorldView.swift
 //
 //  HelloWorldView.swift
 //  ToolApp
 //
-//  Specification:
-//  • Shows a bouncing copper ball in an HDR-capable SwiftUI canvas.
-//  • Runs at up to 120 Hz via TimelineView and supports ProMotion.
-//
-//  Discussion:
-//  Migrating from `Timer` to `TimelineView` ensures smooth animations
-//  on high-refresh displays and keeps physics in sync with render loop.
-//
-//  Rationale:
-//  • Leverages SwiftUI’s animation timeline for performance.
-//  TODO:
-//    – [ ] Integrate a proper Metal shader for HDR P3 lighting.
-//    – [ ] Max-out performance for M4 iPad Pro (1 TB, 16 GB).
-//
-//  Dependencies: SwiftUI, UXKit
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Simple MetalKit-based demo showing a rotating sphere.
+// 2. Dependencies
+//     SwiftUI, MetalKit, RenderKit
+// 3. Overview
+//     Sets up an MTKView, renders a sphere mesh via `DifferentiableRenderer`.
+// 4. Usage
+//     Displayed at launch before loading a project.
+// 5. Notes
+//     Uses a basic Lambertian shading in `PathTracerKernel`.
 
 import SwiftUI
+import MetalKit
+import RenderKit
 
-public struct HelloWorldView: View {
-    @State private var position = CGPoint(x: 100, y: 100)
-    @State private var velocity = CGVector(dx: 60, dy: 40)
-    @EnvironmentObject var coordinator: ToolAppCoordinator
-
-    // Constants
-    private let radius: CGFloat = 50
-    private let gravity = CGVector(dx: 0, dy: 0.05 * 980)  // px/s²
-    private let damping: CGFloat = 0.99
-
-    public var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                ColorPalette.background.ignoresSafeArea()
-
-                // Copper ball
-                Circle()
-                    .fill(Color(red: 0.72, green: 0.45, blue: 0.20, opacity: 1.0))
-                    .frame(width: radius*2, height: radius*2)
-                    .position(position)
-                    .gesture(
-                        DragGesture(minimumDistance: 0).onEnded { value in
-                            let newVel = CGVector(
-                                dx: (position.x - value.location.x) * 5,
-                                dy: (position.y - value.location.y) * 5
-                            )
-                            velocity = newVel
-                        }
-                    )
-
-                // Stage switch
-                VStack {
-                    Spacer()
-                    Button("Enter ToolDev") {
-                        coordinator.loadStage("ToolDev")
-                    }
-                    .padding()
-                    .background(ColorPalette.accent)
-                    .cornerRadius(UXTheme.cornerRadius)
-                    .foregroundColor(.white)
-                }
-            }
-            // Use SwiftUI’s TimelineView for 120Hz updates
-            .timelineView(.animation(minimumInterval: 1.0/120.0)) { context in
-                let _ = context  // ignore; use fixed dt
-                updatePhysics(in: geo.size)
-            }
-        }
+public struct HelloWorldView: UIViewRepresentable {
+    public func makeUIView(context: Context) -> MTKView {
+        let view = MTKView()
+        view.device = MTLCreateSystemDefaultDevice()
+        view.clearColor = MTLClearColor(red: 0.1, green: 0.1, blue: 0.15, alpha: 1)
+        view.delegate = context.coordinator
+        context.coordinator.setup(in: view)
+        return view
     }
 
-    /// Physics update called each frame.
-    private func updatePhysics(in size: CGSize) {
-        // Gravity
-        velocity.dx += gravity.dx * (1.0/120.0)
-        velocity.dy += gravity.dy * (1.0/120.0)
-        // Integrate
-        position.x += velocity.dx * (1.0/120.0)
-        position.y += velocity.dy * (1.0/120.0)
-        // Bounce
-        if position.x < radius || position.x > size.width - radius {
-            velocity.dx = -velocity.dx * damping
-            position.x = min(max(position.x, radius), size.width - radius)
+    public func updateUIView(_ uiView: MTKView, context: Context) {
+        // nothing to update
+    }
+
+    public func makeCoordinator() -> Coordinator { Coordinator() }
+
+    public class Coordinator: NSObject, MTKViewDelegate {
+        private var renderer: DifferentiableRenderer!
+        private var scene: Scene!
+
+        /// Called once when the view is created.
+        func setup(in view: MTKView) {
+            guard let dev = view.device else { fatalError("MTKView has no device") }
+            renderer = DifferentiableRenderer(device: dev)
+            // Build a unit sphere mesh
+            let mesh = GeometryPrimitives.sphere(radius: 0.5, segments: 32)
+            let light = Light(position: [2,2,2], color: [1,1,1], intensity: 2)
+            let cam   = Camera(
+                viewMatrix: float4x4(translation: [0,0,2]).inverse,
+                projectionMatrix: float4x4(perspectiveFOV: .pi/4, aspect: Float(view.drawableSize.width/view.drawableSize.height), nearZ: 0.1, farZ: 10)
+            )
+            scene = Scene(meshes: [mesh], lights: [light], camera: cam)
         }
-        if position.y < radius || position.y > size.height - radius {
-            velocity.dy = -velocity.dy * damping
-            position.y = min(max(position.y, radius), size.height - radius)
+
+        public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+            // update projection if needed
         }
-        velocity.dx *= damping
-        velocity.dy *= damping
+
+        public func draw(in view: MTKView) {
+            guard let drawable = view.currentDrawable else { return }
+            do {
+                let tex = try renderer.render(scene: scene)
+                // Blit to screen
+                let cmdQ = view.device!.makeCommandQueue()!
+                let cmd  = cmdQ.makeCommandBuffer()!
+                let blit = cmd.makeBlitCommandEncoder()!
+                blit.copy(from: tex,
+                          sourceSlice: 0,
+                          sourceLevel: 0,
+                          sourceOrigin: MTLOrigin(x:0,y:0,z:0),
+                          sourceSize: MTLSize(width: tex.width, height: tex.height, depth: 1),
+                          to: drawable.texture,
+                          destinationSlice: 0,
+                          destinationLevel: 0,
+                          destinationOrigin: MTLOrigin(x:0,y:0,z:0))
+                blit.endEncoding()
+                cmd.present(drawable)
+                cmd.commit()
+            } catch {
+                print("HelloWorldView render error: \(error)")
+            }
+        }
     }
 }

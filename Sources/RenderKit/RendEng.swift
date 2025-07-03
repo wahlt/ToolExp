@@ -2,48 +2,33 @@
 //  RendEng.swift
 //  RenderKit
 //
-//  Specification:
-//  • Core renderer using Metal command buffers & encoders.
-//  • Supports multiple mesh types, textures, and post-effects.
-//
-//  Discussion:
-//  Replaces DynamicFallbackRenderer when full feature set available.
-//
-//  Rationale:
-//  • Central place for draw-call management and GPU state setup.
-//  Dependencies: MetalKit
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     High-level render-engine orchestrator for ToolExp.
+// 2. Dependencies
+//     Renderer
+// 3. Overview
+//     Provides convenience entrypoint to render with current settings.
+// 4. Usage
+//     Call `RendEng.shared.run(rep:)` or `run(scene:)`.
+// 5. Notes
+//     May later incorporate UI-controlled quality presets.
 
 import Foundation
-import MetalKit
+import RepKit
 
-public class RendEng {
-    private let device: MTLDevice
-    private let commandQueue: MTLCommandQueue
+public final class RendEng {
+    public static let shared = RendEng()
+    private let renderer = Renderer()
 
-    public init(device: MTLDevice) {
-        self.device = device
-        self.commandQueue = device.makeCommandQueue()!
+    private init() {}
+
+    /// Renders a RepStruct.
+    public func run(rep: RepStruct) throws -> MTLTexture {
+        return try renderer.render(rep: rep)
     }
 
-    /// Renders an array of meshes into the given MTKView.
-    public func render(meshes: [RenderableMesh], in view: MTKView) {
-        guard let drawable = view.currentDrawable,
-              let desc     = view.currentRenderPassDescriptor else { return }
-        let buf = commandQueue.makeCommandBuffer()!
-        let enc = buf.makeRenderCommandEncoder(descriptor: desc)!
-        for mesh in meshes {
-            // Bind mesh.pipelineState, vertexBuffers, textures…
-            enc.setRenderPipelineState(mesh.pipelineState)
-            enc.setVertexBuffer(mesh.vertexBuffer, offset: 0, index: 0)
-            enc.drawPrimitives(type: .triangle,
-                               vertexStart: 0,
-                               vertexCount: mesh.vertexCount)
-        }
-        enc.endEncoding()
-        buf.present(drawable)
-        buf.commit()
+    /// Renders a Scene.
+    public func run(scene: Scene) throws -> MTLTexture {
+        return try renderer.render(scene: scene)
     }
 }

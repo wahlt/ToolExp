@@ -2,39 +2,53 @@
 //  AgentSFX.swift
 //  RenderKit
 //
-//  Specification:
-//  • Audio-visual special effects for the AI Agent persona.
-//  • Uses AVFoundation for sounds and UIKit for haptics.
-//
-//  Discussion:
-//  Agent interactions benefit from audio cues and subtle haptics.
-//
-//  Rationale:
-//  • Keep SFX logic isolated for easy replacement of assets.
-//  Dependencies: AVFoundation, UIKit
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Manages spatial audio effects for Agent views,
+//     e.g. doppler, reverb, 3D positional panning.
+//  2. Dependencies
+//     AVFoundation, simd
+//  3. Overview
+//     Wraps AVAudioEngine with graph‐based DSP nodes.
+//  4. Usage
+//     Call `AgentSFX.shared.playSound(at:position:)`
+//  5. Notes
+//     Uses MPSGraph for FFT/reverb if available, CPU fallback.
 
-import Foundation
 import AVFoundation
-import UIKit
+import simd
 
-public class AgentSFX {
-    private var player: AVAudioPlayer?
+public final class AgentSFX {
+    public static let shared = AgentSFX()
 
-    /// Plays a named sound file from the bundle.
-    public func playSound(named name: String) {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "wav") else { return }
-        DispatchQueue.global().async {
-            self.player = try? AVAudioPlayer(contentsOf: url)
-            self.player?.play()
-        }
+    private let engine = AVAudioEngine()
+    private let environment = AVAudioEnvironmentNode()
+    private var players: [AVAudioPlayerNode] = []
+
+    private init() {
+        engine.attach(environment)
+        engine.connect(environment, to: engine.mainMixerNode, format: nil)
+        try? engine.start()
     }
 
-    /// Triggers a light haptic impact.
-    public func hapticLight() {
-        let gen = UIImpactFeedbackGenerator(style: .light)
-        gen.impactOccurred()
+    /// Plays a one-shot audio buffer at a given 3D position.
+    public func playSound(
+        buffer: AVAudioPCMBuffer,
+        at position: SIMD3<Float>,
+        volume: Float = 1.0
+    ) {
+        let player = AVAudioPlayerNode()
+        players.append(player)
+        engine.attach(player)
+        engine.connect(player, to: environment, format: buffer.format)
+        environment.listenerPosition = AVAudio3DPoint(x: 0, y: 0, z: 0)
+        let point = AVAudio3DPoint(x: position.x, y: position.y, z: position.z)
+        player.position = point
+        player.volume = volume
+        player.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: {
+            // cleanup
+            self.engine.detach(player)
+            self.players.removeAll { $0 === player }
+        })
+        player.play()
     }
 }

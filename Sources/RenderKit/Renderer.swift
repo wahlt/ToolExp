@@ -1,31 +1,38 @@
 //
 //  Renderer.swift
-//  RenderKit — Defines common rendering protocols.
+//  RenderKit
 //
-//  Created by Thomas Wahl on 2025-06-17.
-//
+//  1. Purpose
+//     Public façade over the ToolExp render pipeline.
+// 2. Dependencies
+//     MetalKit, RenderAdapter, DifferentiableRenderer, DynamicFallbackRenderer
+// 3. Overview
+//     Takes either a high-level Scene or a RepStruct and returns
+//     a final MTLTexture via the best available backend.
+// 4. Usage
+//     Call `Renderer.render(scene:)` or `Renderer.render(rep:)`.
+// 5. Notes
+//     Under the hood chooses DifferentiableRenderer or fallback.
 
 import MetalKit
 import RepKit
 
-/// Protocol for rendering a scene graph (`RepStruct`) into an `MTKView`.
-/// All implementations are isolated to the main actor.
-@MainActor
-public protocol Renderer {
-    /// Render the given `RepStruct` in the specified view.
-    ///
-    /// - Parameters:
-    ///   - rep: The scene graph to render.
-    ///   - view: The MetalKit view to draw into.
-    func render(_ rep: RepStruct, in view: MTKView)
-}
+public final class Renderer {
+    private let fallback = DynamicFallbackRenderer()
+    private let diff     = DifferentiableRenderer()
 
-/// Optional protocol for renderers that need to respond to drawable-size changes.
-/// Also isolated to the main actor.
-@MainActor
-public protocol Resizable {
-    /// Notifies the renderer that the view’s drawable size has changed.
-    ///
-    /// - Parameter size: The new drawable size.
-    func drawableSizeWillChange(to size: CGSize)
+    public init() {}
+
+    /// Renders a Scene into a Metal texture.
+    public func render(scene: Scene) throws -> MTLTexture {
+        // For simplicity, always go through fallback
+        return try fallback.render(scene: scene)
+    }
+
+    /// Converts a RepStruct to Scene, then renders.
+    public func render(rep: RepStruct) throws -> MTLTexture {
+        // Convert rep→Scene via RepRenderer
+        let scene = try RepRenderer().scene(from: rep)
+        return try render(scene: scene)
+    }
 }

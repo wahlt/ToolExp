@@ -1,47 +1,49 @@
-// File: Sources/ToolMath/FormalProver.swift
+//
+//  FormalProver.swift
 //  ToolMath
 //
-//  Specification:
-//  • Defines the Proposition type and FormalProver protocol for logical reasoning.
-//
-//  Discussion:
-//  A Proposition carries a human-readable description of a logical statement,
-//  and FormalProver asynchronously validates it, returning true if proved.
-//
-//  Rationale:
-//  • Bringing theorem‐style checks into ToolProof enables rep viability analysis.
-//  • MainActor ensures any UI updates from proof results run on the main thread.
-//
-//  TODO:
-//  • Implement a real prover using an SMT solver or logic library.
-//  • Display proof steps in the UI via ProofKit overlays.
-//
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Provides symbolic proof-of-concept for algebraic identities.
+// 2. Dependencies
+//     Foundation
+// 3. Overview
+//     Parses simple equations and verifies via random testing.
+// 4. Usage
+//     `try FormalProver().prove("a*(b+c) == a*b + a*c")`
+// 5. Notes
+//     Not a full theorem prover—demo only.
+
 import Foundation
 
-/// Represents a logical statement to be proved or disproved.
-@MainActor
-public struct Proposition: Sendable {
-    /// Human‐readable statement of the proposition.
-    public let description: String
-}
-
-/// Protocol for any logical prover that can validate a Proposition.
-@MainActor
-public protocol FormalProver {
-    /// Asynchronously attempts to prove the given proposition.
-    /// - Returns: true if the proposition is logically valid.
-    func prove(_ prop: Proposition) async throws -> Bool
-}
-
-/// Dummy stub that always returns false, for early integration/testing.
-public struct DummyProver: FormalProver {
+public final class FormalProver {
     public init() {}
-    public func prove(_ prop: Proposition) async throws -> Bool {
-        // Always fail to prove in this stub implementation.
-        return false
+
+    /// Attempts to prove the given equation by random substitution.
+    public func prove(_ equation: String, trials: Int = 1000) throws -> Bool {
+        // Parse left/right sides
+        let parts = equation.split(separator: "=").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard parts.count == 2 else { throw NSError(domain:"Prover", code:1, userInfo:nil) }
+        let lhs = parts[0], rhs = parts[1]
+
+        // For each trial, assign random floats to variables, evaluate both sides
+        let vars = Set(equation.compactMap { $0.isLetter ? String($0) : nil })
+        for _ in 0..<trials {
+            var env: [String: Float] = [:]
+            for v in vars { env[v] = Float.random(in:-10...10) }
+            let lv = try evaluate(lhs, env: env)
+            let rv = try evaluate(rhs, env: env)
+            if abs(lv - rv) > 1e-3 { return false }
+        }
+        return true
+    }
+
+    /// Very basic expression evaluator: +, -, *, /, parentheses.
+    private func evaluate(_ expr: String, env: [String:Float]) throws -> Float {
+        // Placeholder: call into a real parser or use NSExpression
+        let ns = NSExpression(format: expr, argumentArray: [])
+        if let val = ns.expressionValue(with: env, context: nil) as? NSNumber {
+            return val.floatValue
+        }
+        throw NSError(domain:"ProverEval", code:2, userInfo:nil)
     }
 }

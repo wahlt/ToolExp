@@ -1,73 +1,53 @@
-// File: Sources/IntegrationKit/ModuleMng.swift
+//
+//  ModuleKit.swift
 //  IntegrationKit
 //
-//  Specification:
-//  • Defines ModuleDescriptor and ModuleMng as the central registry for dynamic plugins.
-//  • ModuleDescriptor holds metadata for each plugin module.
-//  • ModuleMng hosts a singleton and a map of registered descriptors.
+//  Defines the core Module protocol and a registration API
+//  for dynamic, hot-loaded ToolExp modules.
 //
-//  Discussion:
-//  ModuleDescriptor is a simple value type encapsulating a module’s identity and location.
-//  ModuleMng is marked @MainActor to isolate its shared instance and state.
-//  We expose `register(_:)` and `descriptor(for:)` methods for managing modules.
-//
-//  Rationale:
-//  • Providing ModuleDescriptor here prevents missing-type errors.
-//  • @MainActor on ModuleMng silences concurrency‐safety warnings for `shared`.
-//  • Internal `modules` allows extensions (e.g. HotReload) to clear state safely.
-//
-//  TODO:
-//  • Expand ModuleDescriptor with version, dependencies, and entrypoints.
-//  • Implement `register(_:)` to load bundles and populate descriptors.
-//  • Add unit tests for registry operations.
-//
-//  Dependencies: Foundation
-//
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 
-/// Metadata describing a dynamically loaded module.
-public struct ModuleDescriptor: Codable, Sendable {
-    /// Unique name of the module.
-    public let name: String
-    /// File URL or bundle identifier where the module resides.
-    public let bundleURL: URL
+/// Protocol every dynamic ToolExp module must implement.
+public protocol Module {
+    /// Unique identifier for this module.
+    static var moduleID: String { get }
 
-    public init(name: String, bundleURL: URL) {
-        self.name = name
-        self.bundleURL = bundleURL
-    }
+    /// Called immediately after the module is loaded.
+    func didLoad()
+
+    /// Called just before the module is unloaded.
+    func willUnload()
 }
 
-@MainActor
-public class ModuleMng {
-    /// Shared singleton for global module management.
-    public static let shared = ModuleMng()
+/// Central registry for all loaded modules.
+public enum ModuleKit {
+    private static var registry: [String: Module] = [:]
 
-    /// Internal map: module name → descriptor.
-    /// Allows hot-reload extension to clear and re-register modules.
-    internal var modules: [String: ModuleDescriptor] = [:]
-
-    private init() {}
-
-    /// Registers a new module descriptor.
-    /// - Parameter descriptor: The descriptor to add or replace.
-    public func register(_ descriptor: ModuleDescriptor) {
-        modules[descriptor.name] = descriptor
+    /// Registers a module instance and invokes its `didLoad()`.
+    public static func register(_ module: Module) {
+        let id = type(of: module).moduleID
+        registry[id] = module
+        module.didLoad()
     }
 
-    /// Looks up a registered descriptor by module name.
-    /// - Parameter name: The module name to query.
-    /// - Returns: The ModuleDescriptor if registered, or nil.
-    public func descriptor(for name: String) -> ModuleDescriptor? {
-        return modules[name]
+    /// Unregisters a module by ID and invokes its `willUnload()`.
+    public static func unregister(moduleID id: String) {
+        guard let module = registry[id] else { return }
+        module.willUnload()
+        registry.removeValue(forKey: id)
     }
 
-    /// Clears all registered modules.
-    public func clearModules() {
-        modules.removeAll()
+    /// Retrieves a loaded module by its identifier.
+    public static func module(withID id: String) -> Module? {
+        return registry[id]
+    }
+
+    /// Lists all currently registered module IDs.
+    public static func allModuleIDs() -> [String] {
+        return Array(registry.keys)
     }
 }

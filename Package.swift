@@ -1,80 +1,182 @@
-// File: Package.swift
-//  ToolExp
-//
-//  Specification:
-//  • SwiftPM manifest defining all library modules and the ToolApp executable.
-//  • Ensures InvestigateKit and ServiceKit depend on RepKit so they can import it.
-//
-//  Discussion:
-//  - Adds `RepKit` as a dependency of `InvestigateKit` and `ServiceKit` targets.
-//  - Uses `executableTarget` API so the SwiftUI @main entrypoint is recognized.
-//  - Processes Metal shaders under RenderKit’s Shaders folder.
-//
-//  Rationale:
-//  • Aligns module dependencies with import statements in source files.
-//  • Eliminates “no such module 'RepKit'” build errors.
-//  • Centralizes target definitions for clarity and maintainability.
-//
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
-
 // swift-tools-version:6.2
+// Package manifest for ToolExp00 — fully tensorized Tool
+
 import PackageDescription
 
 let package = Package(
-    name: "ToolExp",
+    name: "ToolExp00",
     platforms: [
-        .iOS(.v17),
         .macOS(.v14),
-        .visionOS(.v1)
+        .iOS(.v17)
     ],
     products: [
-        .executable(name: "ToolExp", targets: ["ToolApp"])
-    ],
-    dependencies: [
-        // no external dependencies right now
+        // The main app executable
+        .executable(
+            name: "ToolApp",
+            targets: ["ToolApp"]
+        )
     ],
     targets: [
-        .target(name: "AIKit"),
-        .target(name: "BridgeKit"),
-        .target(name: "BuildKit"),
-        .target(name: "DataServ"),
-        .target(name: "EngineKit"),
-        .target(name: "GestureKit"),
-        .target(name: "IntegrationKit"),
+        // Core AI & UI
+        .target(
+            name: "AIKit",
+            path: "Sources/AIKit"
+        ),
+        .target(
+            name: "BridgeKit",
+            dependencies: ["RepKit"],
+            path: "Sources/BridgeKit"
+        ),
+
+        // Build & Dev Tools
+        .target(
+            name: "BuildKit",
+            path: "Sources/BuildKit"
+        ),
+
+        // Continuity & Sync
+        .target(
+            name: "CloudSyncKit",
+            dependencies: ["ContinuityKit"],
+            path: "Sources/CloudSyncKit"
+        ),
+        .target(
+            name: "ContinuityKit",
+            dependencies: ["RepKit"],
+            path: "Sources/ContinuityKit"
+        ),
+
+        // Data layer (with optional tensor mirror)
+        .target(
+            name: "DataServ",
+            dependencies: ["MLXIntegration", "RepKit"],
+            path: "Sources/DataServ"
+        ),
+
+        // Core Engines
+        .target(
+            name: "EngineKit",
+            dependencies: ["BridgeKit", "RepKit", "PhysicsKit"],
+            path: "Sources/EngineKit",
+            exclude: ["PhysicsKit"] // PhysicsKit is its own target
+        ),
+        .target(
+            name: "PhysicsKit",
+            path: "Sources/EngineKit/PhysicsKit",
+            linkerSettings: [
+                .linkedFramework("MetalPerformanceShadersGraph")
+            ]
+        ),
+
+        // Integration & Investigation
+        .target(
+            name: "IntegrationKit",
+            dependencies: ["RepKit"],
+            path: "Sources/IntegrationKit"
+        ),
         .target(
             name: "InvestigateKit",
-            dependencies: ["RepKit"]     // allows import RepKit in Evaluate.swift
+            path: "Sources/InvestigateKit"
+        ),
+
+        // MLX bindings & graph caching
+        .target(
+            name: "MLXIntegration",
+            path: "Sources/MLXIntegration"
         ),
         .target(
-            name: "ServiceKit",
-            dependencies: ["RepKit"]     // allows import RepKit in FacetServ.swift
+            name: "MLXRepKit",
+            path: "Sources/MLXRepKit",
+            linkerSettings: [
+                .linkedFramework("MetalPerformanceShadersGraph")
+            ]
         ),
+
+        // Project & Rep core
         .target(
             name: "ProjectKit",
-            dependencies: ["DataServ"]
+            dependencies: ["RepKit"],
+            path: "Sources/ProjectKit"
         ),
         .target(
-            name: "RenderKit",
-            path: "Sources/RenderKit",
-            resources: [.process("Shaders")]
+            name: "RepKit",
+            path: "Sources/RepKit"
         ),
-        .target(name: "RepKit"),
-        .target(name: "StageKit"),
-        .target(name: "ToolMath"),
-        .target(name: "UXKit"),
-        .target(name: "MLXIntegration"),
+
+        // Rendering & visualization
+        .target(
+            name: "RenderKit",
+            dependencies: ["MLXIntegration"],
+            path: "Sources/RenderKit",
+            resources: [
+                .process("Shaders")
+            ],
+            linkerSettings: [
+                .linkedFramework("MetalKit"),
+                .linkedFramework("MetalPerformanceShadersGraph")
+            ]
+        ),
+
+        // System services & utilities
+        .target(
+            name: "ServiceKit",
+            dependencies: ["RepKit"],
+            path: "Sources/ServiceKit"
+        ),
+
+        // Spatial audio DSP
+        .target(
+            name: "SpatialAudioKit",
+            dependencies: ["MLXIntegration"],
+            path: "Sources/SpatialAudioKit",
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("MetalPerformanceShadersGraph")
+            ]
+        ),
+
+        // General tensor‐core utilities
+        .target(
+            name: "TensorCoreKit",
+            dependencies: ["MLXIntegration"],
+            path: "Sources/TensorCoreKit",
+            linkerSettings: [
+                .linkedFramework("MetalPerformanceShadersGraph")
+            ]
+        ),
+
+        // Math & tensor utilities
+        .target(
+            name: "ToolMath",
+            dependencies: ["MLXIntegration"],
+            path: "Sources/ToolMath"
+        ),
+
+        // UI toolkit (gestures, DomKit, MagicKit, etc.)
+        .target(
+            name: "UXKit",
+            dependencies: ["RepKit"],
+            path: "Sources/UXKit"
+        ),
+
+        // Asset & inventory management
+        .target(
+            name: "WarehouseKit",
+            dependencies: ["RepKit"],
+            path: "Sources/WarehouseKit"
+        ),
+
+        // The app entry point
         .executableTarget(
             name: "ToolApp",
             dependencies: [
-                "AIKit","BridgeKit","BuildKit","DataServ","EngineKit",
-                "GestureKit","IntegrationKit","InvestigateKit","ProjectKit",
-                "RenderKit","RepKit","ServiceKit","StageKit","ToolMath",
-                "UXKit","MLXIntegration"
+                "AIKit","BridgeKit","BuildKit","CloudSyncKit","ContinuityKit",
+                "DataServ","EngineKit","PhysicsKit","IntegrationKit","InvestigateKit",
+                "MLXIntegration","MLXRepKit","ProjectKit","RepKit","RenderKit",
+                "ServiceKit","SpatialAudioKit","TensorCoreKit","ToolMath",
+                "UXKit","WarehouseKit"
             ],
-            path: "Sources/ToolApp",
-            resources: []
+            path: "Sources/ToolApp"
         )
     ]
 )

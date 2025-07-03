@@ -2,42 +2,37 @@
 //  MetricCollector.swift
 //  InvestigateKit
 //
-//  Specification:
-//  • Aggregates time, memory, and evaluation metrics during Investigate runs.
-//  • Emits a summary at completion.
-//
-//  Discussion:
-//  Detailed metrics help tune mutation heuristics and MLX parameters.
-//
-//  Rationale:
-//  • Data-driven insights guide AI and simulation tuning.
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+// 1. Purpose
+//    Subscribe to MetricKit payloads.
+// 2. Dependencies
+//    Foundation, MetricKit
+// 3. Overview
+//    Logs or forwards performance metrics.
 
 import Foundation
+import MetricKit
 
-public struct InvestigationMetrics {
-    public let duration: TimeInterval
-    public let peakMemoryMB: Double
-    public let bestDensity: Double
+@MainActor
+public final class MetricCollector: NSObject {
+    public static let shared = MetricCollector()
+
+    private override init() {
+        super.init()
+        MXMetricManager.shared.add(self)
+    }
 }
 
-public class MetricCollector {
-    private var start: Date = Date()
-    private var bestDensity: Double = -Double.infinity
-
-    public func markStart() {
-        start = Date()
+// Isolate protocol conformance into a nonisolated extension so it satisfies MXMetricManagerSubscriber.
+extension MetricCollector: MXMetricManagerSubscriber {
+    nonisolated public func didReceive(_ payloads: [MXMetricPayload]) {
+        for payload in payloads {
+            Logger.log("Metrics received: \(payload.dictionaryRepresentation)", level: .debug)
+        }
     }
 
-    public func updateDensity(_ density: Double) {
-        bestDensity = max(bestDensity, density)
-    }
-
-    public func summary() -> InvestigationMetrics {
-        let dur = Date().timeIntervalSince(start)
-        return InvestigationMetrics(duration: dur, peakMemoryMB: 0, bestDensity: bestDensity)
+    nonisolated public func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        for diag in payloads {
+            Logger.log("Diagnostics received: \(diag.dictionaryRepresentation)", level: .error)
+        }
     }
 }

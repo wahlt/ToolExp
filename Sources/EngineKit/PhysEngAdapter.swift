@@ -2,34 +2,48 @@
 //  PhysEngAdapter.swift
 //  EngineKit
 //
-//  Specification:
-//  • Adapter bridging generic physics calls to MechEngActor.
-//  • Normalizes payloads for impulse or full-step operations.
+//  Translates between RepStruct nodes/traits and
+//  PhysicsKit’s MLXArray state vectors.
 //
-//  Discussion:
-//  Higher-level code emits varied payloads; adapter standardizes them.
-//
-//  Rationale:
-//  • Keeps ArchEngActor decoupled from physics API details.
-//  • Provides future hook for GPU-driven physics engines.
-//
-//  Dependencies: simd, MechEngActor
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
-import Foundation
-import simd
+import RepKit
+import MLX
 
-public enum PhysEngAdapter {
-    /// Applies a discrete impulse to a single node.
-    public static func applyImpulse(to repID: UUID, nodeIndex: Int, force: SIMD3<Float>) async {
-        let payload = ["rep": repID, "index": nodeIndex, "force": force] as [String: Any]
-        try? await MechEngActor.shared.apply(payload)
+public struct PhysEngAdapter {
+    /// Builds a state tensor from `RepStruct` nodes carrying `PositionTrait` and `VelocityTrait`.
+    /// - Returns MLXArray of shape `[N,6]` where each row is [x,y,z,vx,vy,vz].
+    public static func tensorFromRep(_ rep: RepStruct) throws -> MLXArray {
+        var flat: [Float] = []
+        for node in rep.nodes {
+            let pos: SIMD3<Float> = node.traits
+                .compactMap { ($0 as? PositionTrait)?.position }
+                .first ?? .zero
+            let vel: SIMD3<Float> = node.traits
+                .compactMap { ($0 as? VelocityTrait)?.velocity }
+                .first ?? .zero
+            flat += [pos.x, pos.y, pos.z, vel.x, vel.y, vel.z]
+        }
+        let n = rep.nodes.count
+        return try MLXArray.make(values: flat, shape: [n, 6], precision: .fp32)
     }
 
-    /// Runs a full physics simulation step.
-    public static func step(repID: UUID) async {
-        try? await MechEngActor.shared.apply(repID)
+    /// Applies a `[N,6]` state tensor back onto `RepStruct` nodes’ PositionTrait.
+    public static func repFromTensor(_ tensor: MLXArray, rep: inout RepStruct) throws {
+        let scalars = tensor.scalars
+        let n = rep.nodes.count
+        guard scalars.count >= n * 6 else {
+            fatalError("PhysEngAdapter: tensor size mismatch")
+        }
+        for i in 0..<n {
+            let base = i * 6
+            let p = SIMD3<Float>(scalars[base],
+                                 scalars[base+1],
+                                 scalars[base+2])
+            rep.nodes[i].traits.removeAll { $0 is PositionTrait }
+            rep.addTrait(PositionTrait(position: p), to: rep.nodes[i])
+        }
     }
 }

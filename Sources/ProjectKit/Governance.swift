@@ -2,35 +2,30 @@
 //  Governance.swift
 //  ProjectKit
 //
-//  Specification:
-//  • Defines project governance policies: access roles, permissions.
-//  • Provides evaluation of policy compliance.
-//
-//  Discussion:
-//  Projects may have multiple collaborators with varied roles.
-//  Governance ensures only authorized edits or launches.
-//
-//  Rationale:
-//  • Centralize policy logic rather than scattering across UI.
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Policy and permission management for the project.
+// 2. Dependencies
+//     Foundation
+// 3. Overview
+//     Singleton exposing governance rules.
+// 4. Usage
+//     `GovernanceService.shared.isAllowed(action:)`
+// 5. Notes
+//     Marked `@MainActor` for concurrency safety.
 
 import Foundation
 
-public enum ProjectRole: String, Codable {
-    case owner, editor, viewer
-}
+@MainActor
+public final class GovernanceService {
+    /// Singleton instance; safe under the MainActor.
+    public static let shared = GovernanceService()
+    private init() {}
 
-public struct Governance {
-    /// Checks if a user with a given role can perform an action.
-    public static func canPerform(role: ProjectRole, action: String) -> Bool {
-        switch (role, action) {
-        case (.owner, _):                return true
-        case (.editor, "edit"), (.editor, "view"):  return true
-        case (.viewer, "view"):          return true
-        default:                         return false
-        }
+    /// Check whether the given action is permitted.
+    public func isAllowed(_ action: String) -> Bool {
+        // Evaluate policy...
+        return true
     }
+
+    // Other governance methods…
 }

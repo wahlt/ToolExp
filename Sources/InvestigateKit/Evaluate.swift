@@ -1,61 +1,29 @@
-// File: Sources/InvestigateKit/Evaluate.swift
+//
+//  Evaluate.swift
 //  InvestigateKit
 //
-//  Specification:
-//  • Defines `EvaluationReport` and `RepEvaluator` to analyze RepStruct graphs.
-//
-//  Discussion:
-//  Imports RepKit (now declared as a dependency) to access Cell and RepStruct.
-//  Performs cycle detection and topological sort, returning metrics in the report.
-//
-//  Rationale:
-//  • Centralizes analysis logic for debugging overlays and diagnostics.
-//  • Codable & Sendable conformance allows report transport across actor contexts.
-//
-//  TODO:
-//  • Expose cycle paths and depth metrics in the report.
-//  • Integrate with HUDOverlayManager for in-app visualization.
-//
-//  Dependencies: Foundation, RepKit
-//
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+// 1. Purpose
+//    Evaluate JavaScript code in a shared context.
+// 2. Dependencies
+//    Foundation, JavaScriptCore
+// 3. Overview
+//    Wraps JSContext for safe script execution.
 
 import Foundation
-import RepKit
+@preconcurrency import JavaScriptCore
 
-public struct EvaluationReport: Codable, Sendable {
-    public let isAcyclic: Bool
-    public let sortedIDs: [UUID]
-    public let errors:    [Error]
-}
+public struct Evaluate {
+    /// Shared JS context; JSContext is not Sendable.
+    private static let jsContext: JSContext = {
+        let ctx = JSContext()!
+        ctx.exceptionHandler = { _, exception in
+            // handle exceptions…
+        }
+        return ctx
+    }()
 
-public struct RepEvaluator {
-    /// Analyze the rep and produce an `EvaluationReport`.
-    public static func evaluate(rep: RepStruct) -> EvaluationReport {
-        var errors: [Error] = []
-        do {
-            try RepIntegrityChecker.check(rep)
-        } catch {
-            errors.append(error)
-        }
-        let acyclic = errors.isEmpty
-        var sorted: [UUID] = []
-        if acyclic {
-            let edges = rep.cells.flatMap { cell in
-                cell.ports.values.map { (cell.id, $0) }
-            }
-            do {
-                sorted = try ConstraintSolver.topologicalSort(edges)
-            } catch {
-                errors.append(error)
-            }
-        }
-        return EvaluationReport(
-            isAcyclic: acyclic,
-            sortedIDs: sorted,
-            errors:    errors
-        )
+    /// Execute JS string and return `String?`.
+    public static func run(js: String) -> String? {
+        return jsContext.evaluateScript(js)?.toString()
     }
 }

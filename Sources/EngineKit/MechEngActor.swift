@@ -2,35 +2,26 @@
 //  MechEngActor.swift
 //  EngineKit
 //
-//  Specification:
-//  • Mechanical actor that runs physics via FysEngActor.
-//  • Interfaces with RepStruct to update node positions.
+//  Coordinates mechanical-engine updates: physics + rule-based traits.
 //
-//  Discussion:
-//  MechEngActor receives “apply” intents, loads graph data,
-//  runs simulation, then writes back updated positions.
-//
-//  Rationale:
-//  • Separates raw physics from Rep-level orchestration.
-//  • Leverages actor isolation for thread safety.
-//
-//  Dependencies: RepKit
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
-import RepKit
 
-public actor MechEngActor {
-    public static let shared = MechEngActor()
-    private init() {}
+public final class MechEngActor {
+    private let fysActor: FysEngActor
 
-    /// Applies physics step for the given Rep ID.
-    public func apply(_ payload: Any?) async throws {
-        guard let repID = payload as? UUID else { return }
-        var (nodes, edges) = try await RepStruct.shared.loadGraph(for: repID)
-        await FysEngActor.shared.simulate(nodes: &nodes, edges: edges, delta: 1/60)
-        try await RepStruct.shared.updatePositions(repID: repID, nodes: nodes)
+    public init(fysActor: FysEngActor) {
+        self.fysActor = fysActor
+    }
+
+    /// Performs a full mechanics update cycle.
+    /// - Parameter dt: Time step.
+    public func update(deltaTime dt: Float) throws {
+        // 1) Tensorized physics step
+        try fysActor.simulateStep(dt: dt)
+        // 2) Here you could apply additional mechanical rules or trait updates
     }
 }

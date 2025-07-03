@@ -2,43 +2,33 @@
 //  ECSArchetype.swift
 //  RepKit
 //
-//  Specification:
-//  • Group of entities matching a set of component types.
-//  • Stores entity IDs sharing identical component signatures.
-//
-//  Discussion:
-//  ECS (Entity-Component-System) pattern helps structure dynamic
-//  Rep behaviors by component families.
-//
-//  Rationale:
-//  • Rapid filtering of entities during system updates.
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ToolExp on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
+//  1. Purpose
+//     Defines archetype keys for efficient entity-component storage.
+//  2. Dependencies
+//     Foundation
+//  3. Overview
+//     Holds component type names to group matching entities.
+//  4. Usage
+//     Use `matches(components:)` to filter entity pools.
+//  5. Notes
+//     Useful for batched operations on homogenous components.
 
 import Foundation
 
+/// Represents a set of component types in an archetype.
 public struct ECSArchetype {
-    public let componentKeys: Set<String>
-    private(set) public var entityIDs: Set<UUID> = []
+    public let components: [String]
 
-    public init(components: Set<String>) {
-        self.componentKeys = components
+    /// Initialize with component type names.
+    public init(components: [String]) {
+        self.components = components
     }
 
-    /// Registers an entity with matching keys.
-    public mutating func add(_ id: UUID) {
-        entityIDs.insert(id)
-    }
-
-    /// Removes an entity.
-    public mutating func remove(_ id: UUID) {
-        entityIDs.remove(id)
-    }
-
-    /// Tests if archetype matches a given component set.
-    public func matches(components: Set<String>) -> Bool {
-        return componentKeys.isSubset(of: components)
+    /// Checks if given component keys satisfy this archetype.
+    public func matches(components other: [String]) -> Bool {
+        return Set(self.components).isSubset(of: Set(other))
     }
 }

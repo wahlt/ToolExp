@@ -1,35 +1,37 @@
 //
 //  MetKit.swift
-//  ToolExp
+//  ToolMath
 //
-//  Created by Thomas Wahl on 6/16/25.
-//
-
-//
-// MetKit.swift
-// ToolMath — Meta-introspection & schema utilities.
-//
-// Helpers to reflect on data structures, derive field lists, etc.
-//
+//  1. Purpose
+//     Statistical and metric computations.
+// 2. Dependencies
+//     Foundation, Statistics
+// 3. Overview
+//     Provides mean, variance, norms, distances.
+// 4. Usage
+//     `MetKit.euclideanNorm(vector)`
+// 5. Notes
+//     Numeric engine–agnostic.
 
 import Foundation
+import Accelerate
 
-/// Protocol for types that can describe their own fields.
-public protocol Reflectable {
-    /// Keys and values of self at runtime.
-    func reflect() -> [String: Any]
-}
+public enum MetKit {
+    public static func euclideanNorm(_ v: [Float]) -> Float {
+        var result: Float = 0
+        vDSP_svesq(v, 1, &result, vDSP_Length(v.count))
+        return sqrt(result)
+    }
 
-public extension Reflectable {
-    func reflect() -> [String: Any] {
-        // Use Mirror for default behavior.
-        let mirror = Mirror(reflecting: self)
-        var dict: [String: Any] = [:]
-        for child in mirror.children {
-            if let label = child.label {
-                dict[label] = child.value
-            }
-        }
-        return dict
+    public static func manhattanNorm(_ v: [Float]) -> Float {
+        return v.reduce(0) { $0 + abs($1) }
+    }
+
+    public static func variance(_ v: [Float]) -> Float {
+        var mean: Float = 0
+        vDSP_meanv(v, 1, &mean, vDSP_Length(v.count))
+        var varOut: Float = 0
+        vDSP_measqv(v, 1, &varOut, vDSP_Length(v.count))
+        return varOut - mean*mean
     }
 }

@@ -2,27 +2,19 @@
 //  Persistable.swift
 //  DataServ
 //
-//  Protocol for models that can be stored and retrieved.
-//  Conforming types must supply a `storageKey` and implement `save()`
-//  to persist themselves.  The DataServ singleton will loadAll/saveAll
-//  any `T: Persistable & Codable` by reading/writing JSON at
-//  <baseURL>/<storageKey>.json.
-//
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ToolExp Recovery on 2025-06-23.
 //  © 2025 Cognautics. All rights reserved.
+//
+//  Description:
+//  Protocol for types that can persist themselves.
 //
 
 import Foundation
 
-/// Protocol for models that can be stored and retrieved.
-public protocol Persistable: Sendable, Codable {
-    /// Filename (without extension) for storage.
-    static var storageKey: String { get }
-}
+public protocol Persistable {
+    /// Saves the entity to persistent store.
+    func save() throws
 
-/// Convenience default: allow a Persistable to save itself.
-public extension Persistable {
-    func save() throws {
-        try DataServ.shared.saveAll([self], as: Self.self)
-    }
+    /// Deletes the entity from persistent store.
+    func delete() throws
 }

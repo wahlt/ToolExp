@@ -2,70 +2,36 @@
 //  RepStruct.swift
 //  RepKit
 //
-//  Specification:
-//  • In‐memory store of multiple Rep graphs.
-//  • Conforms to RepProtocol for graph load/update operations.
-//
-//  Discussion:
-//  Simplest Rep storage: actor‐isolated dictionary of repID→RepStruct.
-//
-//  Rationale:
-//  • Actor ensures thread safety.
-//  • In‐memory store can be replaced with DataServ persistence later.
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ToolExp on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
+//  1. Purpose
+//     Core data model for a graph of Cells.
+//  2. Dependencies
+//     Foundation
+//  3. Overview
+//     Holds unique ID, cell array, and optional metadata.
+//  4. Usage
+//     Used throughout ToolExp as central model.
+//  5. Notes
+//     Codable for persistence and network sync.
 
 import Foundation
 
-public struct RepStruct: Codable {
+/// Represents an entire replication graph (Rep).
+public struct RepStruct: RepProtocol, Identifiable {
     public let id: UUID
     public var cells: [Cell]
-}
+    public var metadata: [String: AnyCodable]
 
-public actor RepStructStore: RepProtocol {
-    public static let shared = RepStructStore()
-    private var store: [UUID: RepStruct] = [:]
-
-    public func loadGraph(for repID: UUID) async throws -> ([Cell], [(Int, Int)]) {
-        guard let rep = store[repID] else {
-            throw NSError(domain: "RepStruct", code: 404, userInfo: [NSLocalizedDescriptionKey: "Rep not found"])
-        }
-        let cells = rep.cells
-        var edges: [(Int, Int)] = []
-        let idIndex = Dictionary(uniqueKeysWithValues: cells.enumerated().map { ($1.id, $0) })
-        for (i, cell) in cells.enumerated() {
-            for (_, targetID) in cell.ports {
-                if let j = idIndex[targetID] {
-                    edges.append((i, j))
-                }
-            }
-        }
-        return (cells, edges)
-    }
-
-    public func updateCells(repID: UUID, cells: [Cell]) async throws {
-        guard store[repID] != nil else {
-            throw NSError(domain: "RepStruct", code: 404, userInfo: [NSLocalizedDescriptionKey: "Rep not found"])
-        }
-        store[repID]?.cells = cells
-    }
-
-    public func applyUpdates(repID: UUID, updates: [RepUpdate]) async throws {
-        guard var rep = store[repID] else {
-            throw NSError(domain: "RepStruct", code: 404, userInfo: [NSLocalizedDescriptionKey: "Rep not found"])
-        }
-        for update in updates {
-            rep = update.applying(to: rep)
-        }
-        store[repID] = rep
-    }
-
-    /// Creates a new empty Rep and returns its ID.
-    public func createEmpty() -> UUID {
-        let rep = RepStruct(id: UUID(), cells: [])
-        store[rep.id] = rep
-        return rep.id
+    /// Initializes a new, empty RepStruct.
+    public init(
+        id: UUID = .init(),
+        cells: [Cell] = [],
+        metadata: [String: AnyCodable] = [:]
+    ) {
+        self.id = id
+        self.cells = cells
+        self.metadata = metadata
     }
 }

@@ -1,73 +1,37 @@
-// File: Sources/ServiceKit/FPKit.swift
+//
+//  FPKit.swift
 //  ServiceKit
 //
-//  Specification:
-//  • Fault Protection Kit: centralized logging, recovery, and user notification.
-//
-//  Discussion:
-//  FPKit records errors with contextual metadata,
-//  supports retry-based recovery strategies,
-//  and presents user‐friendly alerts when invoked.
-//
-//  Rationale:
-//  • Consistent, centralized error handling improves robustness.
-//  • Sendable error logs can flow through async/actor contexts safely.
-//  • UIKit alert code is optional and guarded by `canImport` to allow cross-platform builds.
-//
-//  TODO:
-//  • Persist logs to disk or remote telemetry service.
-//  • Add granular recovery actions per error context.
-//
-//  Dependencies: Foundation, UIKit (optional)
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Floating-point utilities (clamp, lerp, epsilon comparisons).
+// 2. Dependencies
+//     Foundation, simd
+// 3. Overview
+//     Provides global functions for reliable FP math.
+// 4. Usage
+//     let close = FPKit.approxEqual(a,b)
+// 5. Notes
+//     Epsilon can be tuned for application precision.
+
 import Foundation
-#if canImport(UIKit)
-import UIKit
-#endif
+import simd
 
-/// Single error entry with timestamp and context for later analysis.
-public struct ErrorLog: Sendable {
-    public let timestamp: Date
-    public let error:     Error
-    public let context:   String
-}
-
-/// Central fault‐protection service for ToolExp.
-public class FPKit {
-    /// Shared singleton instance.
-    public static let shared = FPKit()
-    private init() {}
-
-    /// Recorded error logs.
-    private(set) public var logs: [ErrorLog] = []
-
-    /// Record an error with context string.
-    public func record(_ error: Error, context: String) {
-        logs.append(ErrorLog(timestamp: Date(), error: error, context: context))
-        // TODO: persist logs to disk or remote store
+public enum FPKit {
+    /// Linear interpolation
+    public static func lerp(_ a: Float, _ b: Float, t: Float) -> Float {
+        return a + (b - a) * t
     }
 
-    /// Attempt context‐based recovery after an error.
-    public func attemptRecovery() {
-        // TODO: implement specific recovery strategies per context
+    /// Clamps value between min and max
+    public static func clamp(_ v: Float, min: Float, max: Float) -> Float {
+        return Swift.max(min, Swift.min(max, v))
     }
 
-    /// Present the latest error in a UIAlertController.
-    public func showLatestError(in vc: UIViewController) {
-        #if canImport(UIKit)
-        guard let last = logs.last else { return }
-        let alert = UIAlertController(
-            title: "An error occurred",
-            message: last.error.localizedDescription,
-            preferredStyle: .alert
-        )
-        alert.addAction(.init(title: "Dismiss", style: .cancel))
-        alert.addAction(.init(title: "Retry",   style: .default) { _ in
-            self.attemptRecovery()
-        })
-        vc.present(alert, animated: true)
-        #endif
+    /// Checks approximate equality within epsilon
+    public static func approxEqual(
+        _ a: Float, _ b: Float,
+        epsilon: Float = 1e-5
+    ) -> Bool {
+        return abs(a - b) <= epsilon
     }
 }

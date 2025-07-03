@@ -1,35 +1,36 @@
 //
 //  ToolAppCoordinator.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/22/25.
-//
-
-//
-//  ToolAppCoordinator.swift
 //  ToolApp
 //
-//  Specification:
-//  • Manages SuperStage transitions and global app state.
-//
-//  Discussion:
-//  Coordinates which View/Takes are active per SuperStage.
-//
-//  Rationale:
-//  • Keeps stage logic out of views.
-//  Dependencies: Foundation, StageKit
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Manages top-level app navigation and state.
+// 2. Dependencies
+//     SwiftUI, RepKit, UXKit
+// 3. Overview
+//     Holds an enum `Screen` and publishes it to switch views.
+// 4. Usage
+//     Provided as an `EnvironmentObject` to `ContentView`.
+// 5. Notes
+//     Automatically transitions from `.hello` to `.project`.
 
-import Foundation
-import Combine
+import SwiftUI
+import RepKit
+import UXKit
 
-public class ToolAppCoordinator: ObservableObject {
-    @Published public private(set) var currentStage: String = "ToolExp"
+public final class ToolAppCoordinator: ObservableObject {
+    public enum Screen {
+        case hello
+        case project(rep: RepStruct)
+    }
 
-    public func loadStage(_ id: String?) {
-        guard let id = id else { return }
-        currentStage = id
+    @Published public private(set) var currentScreen: Screen = .hello
+
+    /// Kick off startup sequence.
+    public func start() {
+        // After a brief pause, load an empty project
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            let rep = RepStruct()               // new empty project
+            self.currentScreen = .project(rep: rep)
+        }
     }
 }

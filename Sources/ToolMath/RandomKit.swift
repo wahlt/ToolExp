@@ -1,38 +1,36 @@
 //
 //  RandomKit.swift
-//  ToolExp
+//  ToolMath
 //
-//  Created by Thomas Wahl on 6/16/25.
-//
-
-//
-// RandomKit.swift
-// ToolMath — Random number utilities and distributions.
-//
+//  1. Purpose
+//     Random number and distribution utilities.
+// 2. Dependencies
+//     Foundation, GameplayKit
+// 3. Overview
+//     Provides uniform, normal, and seedable RNG.
+// 4. Usage
+//     `RandomKit.normal(mean:0, sigma:1, count:100)`
+// 5. Notes
+//     Uses SystemRandom by default.
 
 import Foundation
+import GameplayKit
 
-/// Seeded random number generator.
-public struct SeededGenerator: RandomNumberGenerator {
-    private var state: UInt64
-
-    public init(seed: UInt64) {
-        self.state = seed
-    }
-
-    public mutating func next() -> UInt64 {
-        // Xorshift64* algorithm
-        state ^= state >> 12
-        state ^= state << 25
-        state ^= state >> 27
-        return state &* 2685821657736338717
-    }
-}
-
-/// Utility functions for random sampling.
 public enum RandomKit {
-    /// Sample a uniform Double in [0,1).
-    public static func uniform01<G: RandomNumberGenerator>(using rng: inout G) -> Double {
-        return Double(rng.next() & 0xFFFFFFFF) / Double(UInt32.max)
+    private static var rng = GKMersenneTwisterRandomSource()
+
+    public static func uniform(count: Int, in range: ClosedRange<Float>) -> [Float] {
+        return (0..<count).map { _ in
+            Float(rng.nextUniform())*(range.upperBound - range.lowerBound) + range.lowerBound
+        }
+    }
+
+    public static func normal(mean: Float, sigma: Float, count: Int) -> [Float] {
+        let dist = GKGaussianDistribution(randomSource: rng, mean: 0, deviation: Int(sigma*100))
+        return (0..<count).map { _ in Float(dist.nextInt())/100 + mean }
+    }
+
+    public static func reseed(with seed: UInt64) {
+        rng = GKMersenneTwisterRandomSource(seed: seed)
     }
 }

@@ -2,50 +2,38 @@
 //  ArchEngActor.swift
 //  EngineKit
 //
-//  Specification:
-//  • Actor that interprets high-level execution intents.
-//  • Routes each intent to the appropriate subsystem actor.
+//  Orchestrates applying ArchEngProtocol recommendations
+//  to a RepStruct in batch or per-issue.
 //
-//  Discussion:
-//  Decouples intent dispatch from UI. Intents can represent
-//  physics updates, data queries, rendering commands, etc.
-//
-//  Rationale:
-//  • Actor enforces thread-safety for shared state.
-//  • Routing logic centralizes command handling.
-//
-//  Dependencies: RepKit
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
 import Foundation
 import RepKit
+import BridgeKit
 
-public actor ArchEngActor {
-    public static let shared = ArchEngActor()
+/// Actor that drives the architecture engine, applying
+/// suggested proof-step traits to a RepStruct.
+public final class ArchEngActor {
+    private let engine: ArchEngProtocol
 
-    /// Dispatches an intent by name to subsystem actors.
-    ///
-    /// - Parameters:
-    ///   - intent: E.g. "physics", "data", "render".
-    ///   - payload: Optional context-specific data.
-    public func handle(intent: String, payload: Any?) async throws {
-        switch intent {
-        case "physics":
-            try await RepMechActor.shared.apply(payload)
-        case "data":
-            // Future: DataServActor.shared.query(payload)
-            break
-        case "render":
-            // Future: RepRenderer.shared.render(payload)
-            break
-        default:
-            throw NSError(
-                domain: "EngineKit.ArchEngActor",
-                code: 404,
-                userInfo: [NSLocalizedDescriptionKey: "Unknown intent \(intent)"]
-            )
+    /// Initialize with any ArchEngProtocol implementation.
+    public init(engine: ArchEngProtocol) {
+        self.engine = engine
+    }
+
+    /// Validates and applies suggestions until no issues remain.
+    /// - Parameter rep: In/out `RepStruct` to complete.
+    public func completeProof(rep: inout RepStruct) throws {
+        let validator = RepValidator()
+        var issues = validator.validateProof(rep: rep)
+        while !issues.isEmpty {
+            for issue in issues {
+                let suggestion = engine.suggestNextProofStep(for: rep, issue: issue)
+                rep.addTrait(suggestion.trait, to: suggestion.node)
+            }
+            issues = validator.validateProof(rep: rep)
         }
     }
 }

@@ -1,48 +1,46 @@
 //
 //  DefaultNumericEngine.swift
-//  ToolExp
+//  ToolMath
 //
-//  Created by Thomas Wahl on 6/16/25.
-//
-
-//
-// DefaultNumericEngine.swift
-// ToolMath — A basic numeric engine stub.
-//
-// Provides simple implementations of basic numeric operations,
-// meant to be swapped with a high‐performance tensor engine later.
-//
+//  1. Purpose
+//     CPU fallback implementation of basic numeric routines.
+// 2. Dependencies
+//     Foundation
+// 3. Overview
+//     Provides element-wise add, sub, mul, div on Swift arrays.
+// 4. Usage
+//     Use when GPU (MLX/MPSGraph) is unavailable or for small sizes.
+// 5. Notes
+//     Matches TensorEngine API for seamless switching.
 
 import Foundation
 
-/// Protocol defining core numeric operations.
-public protocol NumericEngine {
-    /// Add two Double arrays elementwise.
-    func add(_ a: [Double], _ b: [Double]) -> [Double]
-
-    /// Multiply two Double arrays elementwise.
-    func multiply(_ a: [Double], _ b: [Double]) -> [Double]
-
-    /// Compute the dot-product of two vectors.
-    func dot(_ a: [Double], _ b: [Double]) -> Double
-}
-
-/// Default in-memory numeric engine.
-public struct DefaultNumericEngine: NumericEngine {
+public struct DefaultNumericEngine {
     public init() {}
 
-    public func add(_ a: [Double], _ b: [Double]) -> [Double] {
-        precondition(a.count == b.count, "Vector lengths must match")
-        return zip(a, b).map(+)
+    /// Element-wise addition of two arrays.
+    public func add(_ a: [Float], _ b: [Float]) -> [Float] {
+        precondition(a.count == b.count, "Mismatched lengths for add")
+        return zip(a,b).map(+)
     }
 
-    public func multiply(_ a: [Double], _ b: [Double]) -> [Double] {
-        precondition(a.count == b.count, "Vector lengths must match")
-        return zip(a, b).map(*)
+    public func subtract(_ a: [Float], _ b: [Float]) -> [Float] {
+        precondition(a.count == b.count, "Mismatched lengths for sub")
+        return zip(a,b).map(-)
     }
 
-    public func dot(_ a: [Double], _ b: [Double]) -> Double {
-        precondition(a.count == b.count, "Vector lengths must match")
-        return zip(a, b).reduce(0) { $0 + $1.0 * $1.1 }
+    public func multiply(_ a: [Float], _ b: [Float]) -> [Float] {
+        precondition(a.count == b.count, "Mismatched lengths for mul")
+        return zip(a,b).map(*)
+    }
+
+    public func divide(_ a: [Float], _ b: [Float]) -> [Float] {
+        precondition(a.count == b.count, "Mismatched lengths for div")
+        return zip(a,b).map(/)
+    }
+
+    public func dot(_ a: [Float], _ b: [Float]) -> Float {
+        precondition(a.count == b.count, "Mismatched lengths for dot")
+        return zip(a,b).reduce(0) { $0 + $1.0 * $1.1 }
     }
 }

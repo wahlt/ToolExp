@@ -1,47 +1,59 @@
 //
 //  StatsKit.swift
-//  ToolExp
-//
-//  Created by Thomas Wahl on 6/22/25.
-//
-
-//
-//  StatsKit.swift
 //  ToolMath
 //
-//  Specification:
-//  • Basic statistical routines: mean, variance, histogram.
-//  • Supports normal distribution PDF and sampling.
-//
-//  Discussion:
-//  Useful for evaluating datasets generated in mathResearch stage.
-//
-//  Rationale:
-//  • Simplify exploratory data analysis in‐app.
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Statistical tests and summaries.
+// 2. Dependencies
+//     Foundation, Accelerate
+// 3. Overview
+//     Mean, median, histogram, correlation.
+// 4. Usage
+//     `StatsKit.correlation(x,y)`
+// 5. Notes
+//     Operates on CPU arrays.
 
 import Foundation
+import Accelerate
 
 public enum StatsKit {
-    /// Computes the mean of an array of Doubles.
-    public static func mean(_ xs: [Double]) -> Double {
-        guard !xs.isEmpty else { return 0 }
-        return xs.reduce(0, +) / Double(xs.count)
+    public static func mean(_ x: [Float]) -> Float {
+        var m: Float = 0
+        vDSP_meanv(x, 1, &m, vDSP_Length(x.count))
+        return m
     }
 
-    /// Computes the variance of an array of Doubles.
-    public static func variance(_ xs: [Double]) -> Double {
-        let m = mean(xs)
-        return xs.map { ($0 - m)*($0 - m) }.reduce(0, +) / Double(xs.count)
+    public static func median(_ x: [Float]) -> Float {
+        var copy = x
+        vDSP_vsort(copy, 1, vDSP_Length(copy.count))
+        let m = copy.count/2
+        return copy[m]
     }
 
-    /// Normal distribution PDF at x.
-    public static func normalPDF(x: Double, mean μ: Double, sigma σ: Double) -> Double {
-        let coeff = 1.0 / (σ * sqrt(2 * .pi))
-        let exponent = -((x - μ)*(x - μ)) / (2*σ*σ)
-        return coeff * exp(exponent)
+    public static func histogram(
+        _ x: [Float], bins: Int, range: ClosedRange<Float>
+    ) -> [Int] {
+        let width = (range.upperBound - range.lowerBound)/Float(bins)
+        var counts = [Int](repeating: 0, count: bins)
+        for v in x {
+            let idx = min(bins-1, max(0, Int((v - range.lowerBound)/width)))
+            counts[idx] += 1
+        }
+        return counts
+    }
+
+    public static func correlation(_ x: [Float], _ y: [Float]) -> Float {
+        precondition(x.count == y.count)
+        var meanX: Float = 0, meanY: Float = 0
+        vDSP_meanv(x, 1, &meanX, vDSP_Length(x.count))
+        vDSP_meanv(y, 1, &meanY, vDSP_Length(y.count))
+        var num: Float = 0, denX: Float = 0, denY: Float = 0
+        for i in 0..<x.count {
+            let dx = x[i] - meanX, dy = y[i] - meanY
+            num   += dx*dy
+            denX  += dx*dx
+            denY  += dy*dy
+        }
+        return num / sqrt(denX * denY)
     }
 }

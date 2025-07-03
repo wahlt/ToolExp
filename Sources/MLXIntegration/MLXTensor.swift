@@ -1,54 +1,39 @@
-// File: Sources/MLXIntegration/MLXTensor.swift
 //
 //  MLXTensor.swift
 //  MLXIntegration
 //
-//  Specification:
-//  • Represents a tensor as a Metal texture, supporting 1D & 2D shapes.
+//  Converts between MLXArray and MPSGraph/MultiArray representations.
 //
-//  Discussion:
-//  Wraps MTLTexture with shape metadata so ML kernels can bind
-//  and process GPU data without additional bookkeeping.
-//
-//  Rationale:
-//  • Simplifies ML pipeline code by pairing texture & dimension info.
-//  • Supports flexible tensor shapes for varied model requirements.
-//
-//  Dependencies: Foundation, Metal
-//  Created by Thomas Wahl on 06/17/2025.
+//  Created by ChatGPT on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
 
-import Foundation
-import Metal
+import MetalPerformanceShadersGraph
+import CoreML
+import MLX
 
-public struct MLXTensor {
-    public let texture: MTLTexture
-    public let shape: [Int]
-
-    /// Wrap an existing Metal texture as a tensor.
-    public init(texture: MTLTexture, shape: [Int]) {
-        self.texture = texture
-        self.shape   = shape
+public extension MLXArray {
+    /// Initialize an MLXArray from an MLMultiArray.
+    convenience init(multiArray: MLMultiArray) throws {
+        let data = try multiArray.toFloatArray()
+        let shape = multiArray.shape.map { Int(truncating: $0) }
+        self = try MLXArray.make(values: data, shape: shape, precision: .fp32)
     }
 
-    /// Allocate a new tensor on `device` with given shape.
-    public init(
-        device: MTLDevice,
-        shape: [Int],
-        pixelFormat: MTLPixelFormat = .r32Float,
-        usage: MTLTextureUsage      = [.shaderRead, .shaderWrite]
-    ) {
-        self.shape = shape
-        let desc  = MTLTextureDescriptor()
-        desc.pixelFormat = pixelFormat
-        desc.usage       = usage
-        desc.width  = shape[0]
-        desc.height = shape.count > 1 ? shape[1] : 1
-
-        guard let tex = device.makeTexture(descriptor: desc) else {
-            fatalError("MLXTensor: failed to create texture for shape \(shape)")
+    /// Convert MLXArray to MLMultiArray for CoreML interoperability.
+    func toMultiArray() throws -> MLMultiArray {
+        let flat = self.scalars
+        let mlShape = self.shape.map(NSNumber.init(value:))
+        let mlArray = try MLMultiArray(shape: mlShape, dataType: .float32)
+        for (i, v) in flat.enumerated() {
+            mlArray[i] = NSNumber(value: v)
         }
-        self.texture = tex
+        return mlArray
+    }
+
+    /// Convert MLXArray to MPSGraphTensorData for graph feeds.
+    func toMPSGraphTensorData() throws -> MPSGraphTensorData {
+        let nd = try self.toMPSNDArray()
+        return MPSGraphTensorData(ndArray: nd)
     }
 }

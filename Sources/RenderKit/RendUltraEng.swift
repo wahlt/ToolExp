@@ -2,40 +2,29 @@
 //  RendUltraEng.swift
 //  RenderKit
 //
-//  Specification:
-//  • High-quality ray-tracing and path-tracing pipeline.
-//  • Leverages Metal Performance Shaders ray-tracing APIs.
-//
-//  Discussion:
-//  For final renders or static snapshots, enabling realistic
-//  reflections, shadows, and global illumination in one pass.
-//
-//  Rationale:
-//  • Provides “ultra” visual mode without altering main render loop.
-//  Dependencies: MetalKit, MetalPerformanceShaders
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     “Ultra” high-quality path tracer using MPSGraph fusion.
+// 2. Dependencies
+//     DifferentiableRenderer, MLXIntegration
+// 3. Overview
+//     Always uses the differentiable DRT pipeline (no CPU fallback).
+// 4. Usage
+//     Call `Ultra.render(scene:)` for production-quality output.
+// 5. Notes
+//     Slower but supports gradients if needed for ML tasks.
 
-import Foundation
-import MetalKit
-import MetalPerformanceShaders
+import MLXIntegration
 
-public class RendUltraEng {
-    private let device: MTLDevice
-    private let rtPipeline: MPSRayIntersector
+public final class RendUltraEng {
+    private let diff = DifferentiableRenderer()
 
-    public init(device: MTLDevice) {
-        self.device = device
-        rtPipeline = MPSRayIntersector(device: device)
-    }
+    public init() {}
 
-    /// Executes a ray-tracing pass for the given scene.
-    public func trace(scene: ArtScene,
-                      into texture: MTLTexture,
-                      commandBuffer: MTLCommandBuffer) {
-        // 1) Build acceleration structures
-        // 2) Encode ray-generation, intersection, shading kernels
-        // 3) Write into `texture`
+    /// Renders via fully fused differentiable path-trace.
+    public func render(scene: Scene) throws -> MTLTexture {
+        let feeds = try scene.toGraphFeeds()
+        let (radiance, _) = try diff.render(feeds: feeds)
+        // Convert tensor → texture
+        return try MLXRenderer().makeTexture(from: MLXArray(ndArray: radiance.ndArray))
     }
 }

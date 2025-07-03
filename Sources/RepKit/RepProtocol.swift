@@ -2,24 +2,24 @@
 //  RepProtocol.swift
 //  RepKit
 //
-//  Specification:
-//  • Defines operations for loading and mutating Rep graphs.
-//  • Abstracts storage backends.
-//
-//  Discussion:
-//  Allows swapping in-memory vs. persistent Rep stores.
-//
-//  Rationale:
-//  • Decouple API from implementation for testability.
-//  Dependencies: Foundation
-//  Created by Thomas Wahl on 06/22/2025.
+//  Created by ToolExp on 2025-07-02.
 //  © 2025 Cognautics. All rights reserved.
 //
+//  1. Purpose
+//     Defines a protocol for RepStruct-like types.
+//  2. Dependencies
+//     Foundation
+//  3. Overview
+//     Requires unique ID and cell array.
+//  4. Usage
+//     Allows alternative implementations of RepStruct.
+//  5. Notes
+//     May be extended for streaming or CRDT replicas.
 
 import Foundation
 
-public protocol RepProtocol {
-    func loadGraph(for repID: UUID) async throws -> ([Cell], [(Int, Int)])
-    func updateCells(repID: UUID, cells: [Cell]) async throws
-    func applyUpdates(repID: UUID, updates: [RepUpdate]) async throws
+/// Protocol for types representing a Rep graph structure.
+public protocol RepProtocol: Codable {
+    var id: UUID { get }
+    var cells: [Cell] { get set }
 }

@@ -2,38 +2,41 @@
 //  CPUProfiler.swift
 //  ServiceKit
 //
-//  Specification:
-//  • Measures CPU usage and wall-clock times for performance analysis.
-//  • Exposes metrics for profiling ToolTune SuperStage.
-//
-//  Discussion:
-//  ToolTune needs fine-grained CPU metrics to identify hotspots.
-//  This util wraps Mach APIs for user and system time.
-//
-//  Rationale:
-//  • Easily integrate into diagnostics dashboards.
-//  • No external dependencies beyond Darwin.
-//
-//  Dependencies: Darwin
-//  Created by Thomas Wahl on 06/22/2025.
-//  © 2025 Cognautics. All rights reserved.
-//
+//  1. Purpose
+//     Measures current CPU utilization of the process.
+// 2. Dependencies
+//     Foundation, Mach
+// 3. Overview
+//     Queries Mach host statistics to compute CPU load fraction.
+// 4. Usage
+//     let usage = CPUProfiler.currentCPUUsage()
+// 5. Notes
+//     Returns 0–1.0; expensive, use sparingly.
 
 import Foundation
+import MachO
+import Darwin
 
-public struct CPUProfile {
-    public let userTime:   TimeInterval
-    public let systemTime: TimeInterval
-}
+public final class CPUProfiler {
+    /// Returns CPU usage fraction [0.0 … 1.0].
+    public static func currentCPUUsage() -> Double {
+        var kr: kern_return_t
+        var taskInfoCount: mach_msg_type_number_t = UInt32(MemoryLayout<task_thread_times_info_data_t>.size) / 4
+        var tinfo = task_thread_times_info_data_t()
 
-public enum CPUProfiler {
-    /// Returns CPU usage since process start.
-    public static func profile() -> CPUProfile {
-        var info = rusage()
-        getrusage(RUSAGE_SELF, &info)
-        let ut = TimeInterval(info.ru_utime.tv_sec)  + TimeInterval(info.ru_utime.tv_usec)  / 1_000_000
-        let st = TimeInterval(info.ru_stime.tv_sec)  + TimeInterval(info.ru_stime.tv_usec)  / 1_000_000
-        return CPUProfile(userTime: ut, systemTime: st)
+        kr = withUnsafeMutablePointer(to: &tinfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(taskInfoCount)) {
+                task_info(mach_task_self_,
+                          task_flavor_t(TASK_THREAD_TIMES_INFO),
+                          $0,
+                          &taskInfoCount)
+            }
+        }
+        guard kr == KERN_SUCCESS else { return 0 }
+        // user + system time in microseconds
+        let userUS = Double(tinfo.user_time.seconds) + Double(tinfo.user_time.microseconds)/1_000_000
+        let sysUS  = Double(tinfo.system_time.seconds) + Double(tinfo.system_time.microseconds)/1_000_000
+        // approximate over interval (this is a snapshot)
+        return min((userUS + sysUS)/Double(ProcessInfo.processInfo.activeProcessorCount), 1.0)
     }
 }
-
